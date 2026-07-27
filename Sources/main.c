@@ -5232,6 +5232,25 @@ __attribute__((unused)) static void PluginShutdown(void)
     // a process try to exit with its own threads frozen.
     ResumeGame();
 
+    // PROOF that this path ran. There is no screen to draw on at exit, so drop a marker file
+    // next to the .3gx instead. If it appears after closing the game, Luma really did signal
+    // onProcessExitEvent and the handshake is live; if it never appears, the event was never
+    // delivered and the whole block is dead weight. Cheap, and it settles the question.
+    if (fsReady)
+    {
+        Handle f;
+        if (R_SUCCEEDED(FSUSER_OpenFile(&f, cfgArchive,
+                fsMakePath(PATH_ASCII, PlgPath("exit_handshake_ran.txt")),
+                FS_OPEN_WRITE | FS_OPEN_CREATE, 0)))
+        {
+            static const char msg[] = "PluginShutdown() ran; resumeExitEvent was signalled.\n";
+            u32 wrote = 0;
+            FSFILE_SetSize(f, sizeof(msg) - 1);
+            FSFILE_Write(f, &wrote, 0, msg, sizeof(msg) - 1, FS_WRITE_FLUSH);
+            FSFILE_Close(f);
+        }
+    }
+
     // Last chance to persist anything the user changed and we had not written yet.
     if (configDirty) { ConfigSave(); configDirty = 0; }
     if (favDirty)    { FavSave();    favDirty = 0; }
