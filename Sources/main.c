@@ -306,18 +306,26 @@ static int favDirty = 0;    // a favorite toggled -> save Favorites.txt on menu 
 static int g_themeIdx = 0, g_themeParchment = 0; // active theme (colors live in CGOLD/... below)
 
 // ===================== Where this plugin keeps its files =====================
-// Luma loads a plugin from  sdmc:/luma/plugins/<TitleID>/<Name>.3gx  and hands us
-// that path in PluginHeader.pluginPathPA (a PHYSICAL address - read it through the
-// PA_PTR mirror). We derive our data directory from it at runtime, so the template
-// works under ANY Title ID with nothing to edit: Settings.cfg, Favorites.txt, the
-// tracker, language files and RAM dumps all land next to the .3gx.
+// Luma loads a plugin from  sdmc:/luma/plugins/<TitleID>/<Name>.3gx  and this is where the
+// plugin keeps Settings.cfg, Favorites.txt, Tracker.txt, lang/, guide/ and dumps/.
 //
-// If that lookup ever fails we fall back to FALLBACK_PLUGIN_DIR. Set that to your
-// own "/luma/plugins/<YOUR_TITLE_ID>/" if you prefer a fixed path - note that
-// <YOUR_TITLE_ID> must be the real 16-hex Title ID, because '<' and '>' are not
-// legal FAT filename characters and a literal placeholder would fail to open.
-#define FALLBACK_PLUGIN_DIR "/luma/plugins/"
-static char g_plgDir[256] = FALLBACK_PLUGIN_DIR;
+// >>> SET THIS to your game's folder once you know its Title ID. <<<
+//
+//     #define PLUGIN_DIR "/luma/plugins/0004000000033500/"
+//
+// Left empty, everything lands in /luma/plugins/ itself. That WORKS, and it is fine for a
+// first run before you know the Title ID - but the folder is shared by every game, so two
+// plugins built from this template would fight over the same Settings.cfg. Do not ship it
+// that way.
+//
+// (An earlier version tried to discover this at runtime from PluginHeader.pluginPathPA.
+// That field is a PHYSICAL address, and the PA_PTR mirror it needs is only valid for the IO
+// region a plugin gets mapped - like the HID register - not for arbitrary FCRAM. On hardware
+// the read never produced a usable path and it silently fell back here, which is how config
+// ended up in /luma/plugins/. A compile-time constant is predictable; that beats clever.)
+#define PLUGIN_DIR ""
+
+#define DEFAULT_PLUGIN_DIR "/luma/plugins/"
 
 // Build "<plugin dir><leaf>" into a rotating static buffer. Two buffers so a caller
 // can hold two paths at once (e.g. read one file while naming another).
@@ -325,37 +333,13 @@ static const char *PlgPath(const char *leaf)
 {
     static char buf[2][320];
     static int which = 0;
+    const char *dir = (PLUGIN_DIR[0] != 0) ? PLUGIN_DIR : DEFAULT_PLUGIN_DIR;
     char *out = buf[which]; which ^= 1;
     int n = 0;
-    for (const char *s = g_plgDir; *s && n < 250; ++s) out[n++] = *s;
-    for (const char *s = leaf;     *s && n < 315; ++s) out[n++] = *s;
+    for (const char *s = dir;  *s && n < 250; ++s) out[n++] = *s;
+    for (const char *s = leaf; *s && n < 315; ++s) out[n++] = *s;
     out[n] = 0;
     return out;
-}
-
-// Resolve g_plgDir from the loader-supplied plugin path. Called once, early.
-static void PlgDirInit(void)
-{
-    PluginHeader *h = (PluginHeader *)0x07000000;
-    if (h->magic != HeaderMagic || !h->pluginPathPA) return;
-    const char *src = (const char *)PA_PTR(h->pluginPathPA);
-
-    char tmp[256];
-    int n = 0;
-    while (n < (int)sizeof(tmp) - 1)
-    {
-        char c = src[n];
-        if (!c) break;
-        tmp[n++] = c;
-    }
-    tmp[n] = 0;
-    if (n < 4 || tmp[0] != '/') return;          // not a path we understand -> keep the fallback
-
-    int slash = -1;
-    for (int i = 0; i < n; ++i) if (tmp[i] == '/') slash = i;
-    if (slash <= 0) return;                       // no directory component
-    tmp[slash + 1] = 0;                           // keep the trailing '/'
-    memcpy(g_plgDir, tmp, (size_t)slash + 2);
 }
 
 // ===================== Config persistence (SD, fs:USER) =====================
@@ -5280,8 +5264,6 @@ void ThreadMain(void *arg)
     gCompose = (u8 *)malloc(TOP_W * TOP_H * 3);
     savedBot = (u16 *)malloc(BOT_W * BOT_H * 2);
     savedTop = (u16 *)malloc(TOP_W * TOP_H * 2);
-    PlgDirInit(); // work out luma/plugins/<TitleID>/ from the loader-supplied path (do this FIRST:
-                  // every load/save below builds its path from it)
     ApplyTheme(0); // seed the live colors from THEMES[0] BEFORE anything can draw. Without this a
                    // fresh install (no Settings.cfg -> ConfigLoad never calls ApplyTheme) would run
                    // on whatever the CINK/CBG initializers happen to hold.

@@ -43,10 +43,16 @@ cp CTRComposer-BlankTemplate.3gx  <SD>/luma/plugins/<TitleID>/
 
 Then launch the game with Luma's plugin loader enabled and press **SELECT**.
 
-The plugin works out of the box under **any** Title ID: it reads its own install path from
-the loader (`PluginHeader.pluginPathPA`) and keeps `Settings.cfg`, `Favorites.txt`,
-`Tracker.txt`, `lang/`, `guide/` and `dumps/` in that same folder. There is no Title ID to
-hard-code — though you can pin one via `FALLBACK_PLUGIN_DIR` if you prefer.
+The plugin **loads** under any Title ID — `Targets:` is empty in the `.plgInfo`. Where it
+**stores** its data is one `#define` in [`Sources/main.c`](Sources/main.c):
+
+```c
+#define PLUGIN_DIR "/luma/plugins/0004000000033500/"   // your game's folder
+```
+
+Left empty, `Settings.cfg`, `Favorites.txt`, `Tracker.txt`, `lang/`, `guide/` and `dumps/`
+land in `/luma/plugins/` itself. That works for a first run, but the folder is shared by every
+game — set it before you ship.
 
 ## What's in the box
 
@@ -362,14 +368,19 @@ so users keep their settings across updates (dropping the blob entirely resets e
 label-keyed state (favorites, a completion tracker) is more robust in its **own text file** keyed by
 a stable string, so adding or reordering items never invalidates saved entries.
 
-> **How this template does it** — rather than hard-coding `<TitleID>`, `PlgDirInit()` reads the
-> plugin's own install path out of `PluginHeader.pluginPathPA` (a *physical* address — read it
-> through the `PA_PTR` mirror) and strips the filename. Every path is then built with
-> `PlgPath("Settings.cfg")`. That means the template runs under **any** Title ID untouched, and
-> `Settings.cfg`, `Favorites.txt`, `Tracker.txt`, `lang/`, `guide/` and `dumps/` all land next to
-> the `.3gx`. If the lookup ever fails it falls back to `FALLBACK_PLUGIN_DIR`, which you can pin
-> to a fixed folder. Note a literal `<YOUR_TITLE_ID>` placeholder would *not* work as a path:
-> `<` and `>` are not legal FAT filename characters.
+> **How this template does it** — one constant, `PLUGIN_DIR`, and every path is built from it
+> with `PlgPath("Settings.cfg")`. Set it to `"/luma/plugins/<your 16-hex Title ID>/"`; leave it
+> empty and everything lands in `/luma/plugins/`, which works but is shared by every game.
+>
+> Note a *literal* `<YOUR_TITLE_ID>` placeholder cannot be used as the path: `<` and `>` are not
+> legal FAT filename characters, so the file would simply fail to open.
+>
+> A previous version tried to discover the folder at runtime from `PluginHeader.pluginPathPA`.
+> **It does not work**, and the failure is silent: that field is a *physical* address, and the
+> `PA_PTR` mirror it needs is only valid for the IO region a plugin gets mapped (the HID
+> register, say) — not for arbitrary FCRAM. On hardware the read never yielded a usable path, so
+> it always fell through to the fallback and quietly wrote config to the shared folder. If you
+> are tempted to make this automatic, verify it on a console before trusting it.
 
 ---
 
