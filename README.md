@@ -14,8 +14,11 @@ It ships with **zero game art and zero game addresses**. The example cheats are 
 placeholders that write nothing until you enable them (see `EXAMPLE_ENABLED` in
 [`Sources/main.c`](Sources/main.c)).
 
-**[Project page](https://samabr85.github.io/CTRComposer/)** ·
-**Latest `.3gx`** under the *Releases* tab of this repository
+**[Project page](https://samabr85.github.io/CTRComposer/)**
+
+> **No prebuilt `.3gx` is published yet.** Build it yourself — see *Quick start* below. There is
+> an open issue with the plugin hanging the console on some game + NTR-CFW combinations, and
+> nothing gets shipped until that is understood.
 
 <p align="center">
   <img src="screenshots/hero.png" alt="CTRComposer running on a 3DS: the HOME menu on the top screen and the control legend on the bottom" width="360">
@@ -66,7 +69,7 @@ game — set it before you ship.
 | `Includes/themes.h` | Theme table. Ships one neutral monochrome theme. |
 | `Includes/guide.h` | Embedded guide pages (generic placeholders). |
 | `Assets/gen_glyphs.py` | Redraws the button-glyph sheet from primitives. |
-| `.github/workflows/build.yml` | CI: builds the `.3gx`, attaches it to `v*` tag releases. |
+| `.github/workflows/build.yml` | CI: builds the `.3gx` on every push and uploads it as a run artifact. |
 
 ---
 
@@ -576,14 +579,10 @@ landed; a blind `sed` can silently no-op and freeze the on-screen version.
 
 ## Continuous integration
 
-`.github/workflows/build.yml` builds on every push and PR, and on a `v*` tag it creates a
-GitHub Release with `CTRComposer-BlankTemplate.3gx` attached. It runs in the official
-`devkitpro/devkitarm` container and builds `3gxtool` from source, since that tool is not part
-of the image. It also asserts the output really is a `3GX$0002` container.
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0   # cut a release
-```
+`.github/workflows/build.yml` builds on every push and PR and uploads
+`CTRComposer-BlankTemplate.3gx` as a run artifact, which you can download from the Actions tab.
+It runs in the official `devkitpro/devkitarm` container and builds `3gxtool` from source, since
+that tool is not part of the image. It also asserts the output really is a `3GX$0002` container.
 
 ## Credits
 

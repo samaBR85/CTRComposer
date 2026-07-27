@@ -11,3 +11,6 @@ build/
 _reference/
 CTRComposer-Blank-Template.md
 CTRComposer-Repo-Kickoff.md
+_control/
+dumps/
+screenshots/*.tmp
