@@ -1,0 +1,63 @@
+name: build
+
+# Build on every push/PR so breakage is caught early, and additionally on v* tags,
+# where the built .3gx is attached to a GitHub Release.
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Official devkitPro image: ships devkitARM + libctru and sets $DEVKITARM.
+    # devkitPro asks that CI use these images rather than running pacman directly.
+    container: devkitpro/devkitarm:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The Makefile invokes a bare `3gxtool`, which is not part of the devkitARM
+      # image (on Windows it comes from the thepixellizeross-win pacman repo).
+      # Build it from source and drop it on the image's PATH.
+      - name: Build and install 3gxtool
+        run: |
+          set -eux
+          apt-get update
+          apt-get install -y --no-install-recommends cmake g++ make git ca-certificates
+          git clone --depth 1 https://github.com/biometrix76/3gxtool.git /tmp/3gxtool
+          cmake -S /tmp/3gxtool -B /tmp/3gxtool/build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/3gxtool/build --config Release -j"$(nproc)"
+          install -m755 "$(find /tmp/3gxtool/build -name '3gxtool' -type f -perm -u+x | head -n1)" \
+            /opt/devkitpro/tools/bin/3gxtool
+          3gxtool | head -n 3
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Verify artifact
+        run: |
+          set -eux
+          test -f CTRComposer-BlankTemplate.3gx
+          ls -l CTRComposer-BlankTemplate.3gx
+          # Luma3DS only accepts the 3GX$0002 container; fail loudly on 3GX$0001.
+          head -c 8 CTRComposer-BlankTemplate.3gx | grep -q '3GX\$0002'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CTRComposer-BlankTemplate
+          path: CTRComposer-BlankTemplate.3gx
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: CTRComposer-BlankTemplate.3gx
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

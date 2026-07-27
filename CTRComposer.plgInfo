@@ -1,0 +1,33 @@
+Author: Your Name
+
+Version: # Plugin version - bump this every release
+    Major: 0
+    Minor: 1
+    Revision: 0
+
+# Low TitleIds of the games this plugin is compatible with, one per line, e.g.
+#   Targets:
+#       - 0x00033500
+# Left EMPTY on purpose: the blank template loads under any Title ID so it runs
+# out of the box. Once you know your game's Title ID, fill it in here AND install
+# the built .3gx to sdmc:/luma/plugins/<YOUR_TITLE_ID>/ - that same <YOUR_TITLE_ID>
+# is the folder the engine reads/writes Settings.cfg and its data files from.
+Targets:
+
+Title: CTRComposer Blank Template
+
+Summary: Game-agnostic starter plugin built on the CTRComposer engine
+
+Description: |
+  CTRComposer: a raw .3gx overlay engine for the 3DS (no CTRPluginFramework).
+  This is the blank template: the full engine - menu, themes, tools, keypad,
+  button glyphs, persistence - with no game bolted on. Add your cheat table,
+  your art and your Title ID to make it yours.
+
+Compatibility: Any
+
+# 5MiB leaves headroom for embedded guide text and Cheat Search snapshots.
+# 2MiB / 5MiB / 10MiB are the accepted values.
+MemorySize: 5MiB
+
+UsePrivateMemory: false
