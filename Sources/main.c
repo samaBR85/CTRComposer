@@ -16,7 +16,10 @@
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
 // Opt-in: respond to Luma's process-exit event and tear the plugin down before the game dies.
-// See the block in ThreadMain for why this is off. 0 = behave exactly like the reference plugin.
+//
+// OFF because it was MEASURED not to work - see the block in ThreadMain. Left in the tree
+// because it costs nothing and a future Luma build may start delivering the event; flipping
+// this to 1 also writes a marker file at shutdown so you can tell in one run.
 #define EXIT_HANDSHAKE 0
 
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
@@ -5305,15 +5308,16 @@ void ThreadMain(void *arg)
         // appears to be: clean up, then signal resumeExitEvent so the loader can finish tearing
         // the plugin down.
         //
-        // DISABLED BY DEFAULT, and the reason is worth reading before you turn it on. The
-        // reference plugin this engine came from does NOT do this handshake either, and it does
-        // not exhibit the teardown problems we chased. Enabling it here changed nothing
-        // observable on hardware - the game still took just as long to close - which suggests
-        // PROCESSOP_GET_ON_EXIT_EVENT is not actually handing us a usable event in main(), so
-        // onProcessExitEvent stays 0 and this whole block is skipped anyway.
+        // DISABLED BY DEFAULT because it was TESTED AND DOES NOT RUN. Built with this on, and
+        // with PluginShutdown() writing a marker file to the SD card as proof, the marker never
+        // appeared after closing the game - while Settings.cfg written by the same code path
+        // did. So the file I/O was fine and this block simply never executed:
+        // PROCESSOP_GET_ON_EXIT_EVENT in main() does not hand back a usable event, and
+        // onProcessExitEvent stays 0.
         //
-        // It is kept because it is probably the RIGHT thing to do and costs nothing to try, but
-        // it is unverified. Do not assume it works without testing on a console.
+        // The reference plugin this engine came from ignores these events too, and shows no
+        // teardown problems, so nothing is lost. Kept behind the flag in case a future Luma
+        // build starts delivering the event - the marker file makes that a one-run check.
         if (onProcessExitEvent && svcWaitSynchronization(onProcessExitEvent, 0) == 0)
         {
             PluginShutdown();
