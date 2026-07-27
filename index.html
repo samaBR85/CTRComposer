@@ -91,7 +91,7 @@
       <span class="chip">any Title ID</span>
     </div>
     <div class="cta">
-      <a class="btn primary" id="dl" href="https://github.com/samaBR85/CTRComposer/releases/latest">
+      <a class="btn primary" href="https://github.com/samaBR85/CTRComposer/releases">
         Download the .3gx
       </a>
       <a class="btn" href="https://github.com/samaBR85/CTRComposer">Source on GitHub</a>
@@ -204,9 +204,10 @@ make</code></pre>
 
 <script>
 (function () {
+  // The download button links to the Releases PAGE on purpose - the visitor picks the version
+  // and sees the notes. This script only fills in the "latest version / size / downloads" line.
   var API = 'https://api.github.com/repos/samaBR85/CTRComposer/releases';
   var meta = document.getElementById('meta');
-  var dl = document.getElementById('dl');
 
   function fmt(n) { return n.toLocaleString('en-US'); }
 
@@ -227,7 +228,6 @@ make</code></pre>
 
       var latest = rels.find(function (r) { return !r.draft && !r.prerelease; }) || rels[0];
       var asset = (latest.assets || []).find(function (a) { return /\.3gx$/.test(a.name); });
-      if (asset) dl.href = asset.browser_download_url;
 
       var when = new Date(latest.published_at).toLocaleDateString('en-US',
                    { year: 'numeric', month: 'short', day: 'numeric' });
