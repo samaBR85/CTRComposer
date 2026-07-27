@@ -15,9 +15,13 @@
 // is your confirmation that the .3gx actually on the SD card is the one you just compiled.
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
+// Opt-in: respond to Luma's process-exit event and tear the plugin down before the game dies.
+// See the block in ThreadMain for why this is off. 0 = behave exactly like the reference plugin.
+#define EXIT_HANDSHAKE 0
+
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
-#define PLUGIN_VER "v0.1.3 build 5"   // full string - About screen and pause box (have room)
-#define PLUGIN_TAG "b5"               // compact tag - cramped menu title bar
+#define PLUGIN_VER "v0.1.3 build 6"   // full string - About screen and pause box (have room)
+#define PLUGIN_TAG "b6"               // compact tag - cramped menu title bar
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
@@ -5222,7 +5226,7 @@ static void QuickMenu(void)
 
 // Release everything we hold, in the reverse order we took it. Called when Luma tells us the
 // game is exiting, BEFORE we signal that the loader may continue.
-static void PluginShutdown(void)
+__attribute__((unused)) static void PluginShutdown(void)
 {
     // If we are torn down with the menu open the game's threads are still suspended. Never let
     // a process try to exit with its own threads frozen.
@@ -5277,17 +5281,27 @@ void ThreadMain(void *arg)
         // 4ms while a toast is on screen (fast re-stamp), 20ms otherwise
         svcSleepThread((toastTicks > 0 ? 4 : 20) * 1000 * 1000);
 
-        // Luma signals onProcessExitEvent when the game is shutting down. The 3gx contract is:
-        // clean up, then signal resumeExitEvent so the loader can finish tearing the plugin
-        // down. main() asks for these two events - ignoring them afterwards leaves the loader
-        // waiting mid-teardown while our fs session, SD archive and shared-memory mappings are
-        // all still live, which is a good way to break the NEXT thing you launch.
+#if EXIT_HANDSHAKE
+        // Luma signals onProcessExitEvent when the game is shutting down. The 3gx contract
+        // appears to be: clean up, then signal resumeExitEvent so the loader can finish tearing
+        // the plugin down.
+        //
+        // DISABLED BY DEFAULT, and the reason is worth reading before you turn it on. The
+        // reference plugin this engine came from does NOT do this handshake either, and it does
+        // not exhibit the teardown problems we chased. Enabling it here changed nothing
+        // observable on hardware - the game still took just as long to close - which suggests
+        // PROCESSOP_GET_ON_EXIT_EVENT is not actually handing us a usable event in main(), so
+        // onProcessExitEvent stays 0 and this whole block is skipped anyway.
+        //
+        // It is kept because it is probably the RIGHT thing to do and costs nothing to try, but
+        // it is unverified. Do not assume it works without testing on a console.
         if (onProcessExitEvent && svcWaitSynchronization(onProcessExitEvent, 0) == 0)
         {
             PluginShutdown();
             if (resumeExitEvent) svcSignalEvent(resumeExitEvent);
             svcExitThread();   // does not return
         }
+#endif
         u32 pad = HID_PAD, down = ARepeat(pad, &prev, &g_arHold);
 
         const QmCombo *qc = &qmCombos[qmCombo];
