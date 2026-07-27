@@ -26,10 +26,11 @@ its own — the game behind the window is just whatever title it was loaded into
 
 | | |
 |:--:|:--:|
-| <img src="screenshots/cheat_examples_01.png" width="300"><br>**Example cheats** — toggles get a checkbox, one-shot actions get a plain box. All inert until you add addresses. | <img src="screenshots/cheat_examples_02.png" width="300"><br>**Info box** (`X`) — per-item help, with `{HK}` swapped for the live hotkey glyph. |
+| <img src="screenshots/cheat_examples_01.png" width="300"><br>**Example cheats** — toggles get a checkbox, one-shot actions get a plain box. All inert until you add addresses. | <img src="screenshots/cheat_examples_02.png" width="300"><br>**Value picker** — for cheats where a toggle makes no sense: pick from a list, with a live preview of the current value. |
 | <img src="screenshots/cheat_search.png" width="300"><br>**Cheat Search** — known/unknown value, scan types, region filter, one-step undo. | <img src="screenshots/hex_editor.png" width="300"><br>**Hex Editor** + the code-drawn keypad. A–F grey out in DEC mode; read-only memory is refused, not crashed. |
-| <img src="screenshots/checklist_01.png" width="300"><br>**Tracker** — per-item progress that syncs from memory. Ships with placeholder rows only. | <img src="screenshots/game_guide.png" width="300"><br>**Guide reader** — word-wrap, categories, and resume. Load pages from C or from the SD card. |
-| <img src="screenshots/settings.png" width="300"><br>**Settings** — theme, language, toast, and rebindable in-game hotkeys, all persisted. | <img src="screenshots/about.png" width="300"><br>**About** — text only. No logo image, so nothing third-party to inherit. |
+| <img src="screenshots/checklist_01.png" width="300"><br>**Tracker** — per-item progress that syncs from memory. Ships with placeholder rows only. | <img src="screenshots/checklist_02.png" width="300"><br>**Tracker detail** — status, hint, and a location you reveal with `X`, so a guide can stay spoiler-free. |
+| <img src="screenshots/game_guide.png" width="300"><br>**Guide reader** — word-wrap, categories, and resume. Load pages from C or from the SD card. | <img src="screenshots/settings.png" width="300"><br>**Settings** — theme, language, toast, and rebindable in-game hotkeys, all persisted. |
+| <img src="screenshots/about.png" width="300"><br>**About** — text only. No logo image, so nothing third-party to inherit. | |
 
 ## Quick start
 

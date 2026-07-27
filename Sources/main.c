@@ -16,8 +16,8 @@
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
-#define PLUGIN_VER "v0.1.3 build 4"   // full string - About screen and pause box (have room)
-#define PLUGIN_TAG "b4"               // compact tag - cramped menu title bar
+#define PLUGIN_VER "v0.1.3 build 5"   // full string - About screen and pause box (have room)
+#define PLUGIN_TAG "b5"               // compact tag - cramped menu title bar
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
@@ -3045,7 +3045,7 @@ static void ToolAbout(void)
         { "",                            0 },
         { "CTRComposer engine",          1 },
         { "A raw .3gx overlay engine for",          0 },
-        { "the 3DS - no CTRPluginFramework.",       0 },
+        { "the Nintendo 3DS.",                      0 },
         { "Made by samaBR",              1 },
         { "github.com/samaBR85/CTRComposer",        0 },
         { "",                            0 },

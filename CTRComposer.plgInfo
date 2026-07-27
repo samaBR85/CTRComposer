@@ -19,7 +19,7 @@ Title: CTRComposer Blank Template
 Summary: Game-agnostic starter plugin built on the CTRComposer engine
 
 Description: |
-  CTRComposer: a raw .3gx overlay engine for the 3DS (no CTRPluginFramework).
+  CTRComposer: a raw .3gx overlay engine for the 3DS.
   This is the blank template: the full engine - menu, themes, tools, keypad,
   button glyphs, persistence - with no game bolted on. Add your cheat table,
   your art and your Title ID to make it yours.
