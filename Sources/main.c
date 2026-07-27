@@ -16,8 +16,8 @@
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
-#define PLUGIN_VER "v0.1.2 build 3"   // full string - About screen and pause box (have room)
-#define PLUGIN_TAG "b3"               // compact tag - cramped menu title bar
+#define PLUGIN_VER "v0.1.3 build 4"   // full string - About screen and pause box (have room)
+#define PLUGIN_TAG "b4"               // compact tag - cramped menu title bar
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
@@ -1187,6 +1187,23 @@ static u8 CBG[3]    = { 18, 18, 20 };
 // colors from the bg luminance so overlays (e.g. the quick menu) stay readable everywhere.
 static int ThemeBgLight(void) { return (CBG[0] * 30 + CBG[1] * 59 + CBG[2] * 11) / 100 > 140; }
 
+static u8 ClampU8(int v) { return (u8)(v < 0 ? 0 : v > 255 ? 255 : v); }
+
+// A recessed "inset" surface: form fields, value wells, progress troughs, status pills.
+//
+// Every one of these used to be a hardcoded olive literal (52,40,22 and friends) inherited from
+// the original plugin's parchment palette. They ignored the theme completely, so switching to a
+// dark theme left brown boxes scattered across the UI. Deriving them from CBG here means ONE
+// place controls the look and every theme - including ones you add later - just works.
+//
+// dim != 0 flattens the surface back toward the background, for disabled/locked fields.
+static void CFillInset(int x, int y, int w, int h, int dim)
+{
+    int lift = ThemeBgLight() ? -26 : 28;   // light theme: sink it. dark theme: raise it.
+    if (dim) lift /= 3;
+    CFill(x, y, w, h, ClampU8(CBG[0] + lift), ClampU8(CBG[1] + lift), ClampU8(CBG[2] + lift));
+}
+
 // A fixed dark inset field (status pills, dark tooltips) needs text that stays legible even when
 // the active theme's accent is itself dark (a muted brown or navy accent, say).
 // Lift a too-dark color toward white, preserving hue, so it reads on the ~{20,16,10} inset.
@@ -2198,7 +2215,7 @@ static void InfoBox(const Item *it)
     // readable over EVERY theme (light themes' own INK/GOLD are dark and would vanish here).
     #define IB_GOLD 236, 200, 120
     #define IB_INK  248, 240, 216
-    CFill(bx, by, bw, bh, 24, 18, 10);
+    CFillInset(bx, by, bw, bh, 0);
     CFill(bx, by, bw, 1, IB_GOLD); CFill(bx, by + bh - 1, bw, 1, IB_GOLD);
     CFill(bx, by, 1, bh, IB_GOLD); CFill(bx + bw - 1, by, 1, bh, IB_GOLD);
     // title without any " (...)" tail - the description below already explains it
@@ -2322,6 +2339,7 @@ static void PickerRun(const Picker *pk)
 // open the service, map the shared memory, read touch directly. No ir:rst.
 static int   hidReady;
 static vu32 *hidShmem;
+static Handle g_hidMem;   // kept so PluginShutdown() can unmap the block again
 
 static void KbInit(void)
 {
@@ -2348,6 +2366,7 @@ static void KbInit(void)
     { svcCloseHandle(mem); return; }
 
     hidShmem = sh;
+    g_hidMem = mem;   // NOT closed here: svcUnmapMemoryBlock needs it at shutdown
     hidReady = 1;
 }
 
@@ -2367,8 +2386,6 @@ static int HidTouch(int *px, int *py)
 // hit-test a touch against a key rect
 static int KbHit(int tx, int ty, int x, int y, int w, int h)
 { return tx >= x && tx < x + w && ty >= y && ty < y + h; }
-
-static u8 ClampU8(int v) { return (u8)(v < 0 ? 0 : v > 255 ? 255 : v); }
 
 // OPTIONAL keypad skin. Leave NULL for the code-drawn keys. Point it at your own RGBA4444
 // tile (any size - DrawScaled stretches it to each key rect) and the whole keypad is
@@ -2471,7 +2488,7 @@ static u32 EnterNum(const char *title, u32 initial, int *cancel)
             char disp[40];
             if (hex) siprintf(disp, "0x%lX", (unsigned long)val);
             else     siprintf(disp, "%lu  (0x%lX)", (unsigned long)val, (unsigned long)val);
-            CFill(12, 30, 296, 18, 18, 13, 7);
+            CFillInset(12, 30, 296, 18, 0);
             CText(18, 31, disp, INK, 0);
 
             for (int i = 0; i < nb; ++i)
@@ -2879,9 +2896,7 @@ static void SearchDrawForm(void)
         // background (or sink it on a light theme) so the box reads as an input, and flatten it
         // back toward the background when the field is locked. These were hardcoded olive
         // values left over from the original palette, which ignored the theme entirely.
-        int lift = ThemeBgLight() ? -26 : 28;
-        if (dim) lift /= 3;
-        CFill(vx, y, vw, fh, ClampU8(CBG[0] + lift), ClampU8(CBG[1] + lift), ClampU8(CBG[2] + lift));
+        CFillInset(vx, y, vw, fh, dim);
         CFill(vx, y, vw, 1, GOLD); CFill(vx, y + fh - 1, vw, 1, GOLD);
         CFill(vx, y, 1, fh, GOLD); CFill(vx + vw - 1, y, 1, fh, GOLD);
         const u8 *fc = dim ? CDIM : CINK;
@@ -3140,7 +3155,7 @@ static void RamDumpDrawTop(const char *status, u8 sr, u8 sg, u8 sb, int pct)
     if (pct >= 0)
     {
         int bw = WIN_W - 40, bx = x;
-        CFill(bx, y, bw, 9, 40, 32, 20);
+        CFillInset(bx, y, bw, 9, 1);
         CFill(bx, y, bw * pct / 100, 9, 120, 200, 120);
         CFill(bx, y, bw, 1, GOLD); CFill(bx, y + 8, bw, 1, GOLD);
         CFill(bx, y, 1, 9, GOLD);  CFill(bx + bw - 1, y, 1, 9, GOLD);
@@ -3174,10 +3189,10 @@ static void RamDumpDrawForm(void)
     {
         int y = fy + i * (fh + g);
         CText6(lx, y + 6, T(labels[i]), INK);
-        CFill(vx, y, vw, fh, 52, 40, 22);
+        CFillInset(vx, y, vw, fh, 0);
         CFill(vx, y, vw, 1, GOLD); CFill(vx, y + fh - 1, vw, 1, GOLD);
         CFill(vx, y, 1, fh, GOLD); CFill(vx + vw - 1, y, 1, fh, GOLD);
-        CText6(vx + 6, y + 6, val[i], 236, 236, 210);
+        CText6(vx + 6, y + 6, val[i], INK);
     }
     int by = fy + 2 * (fh + g) + 10;
     KbKey(14,  by, 140, 32, T("From Search"), 4, 0);
@@ -3391,10 +3406,10 @@ static void HexDrawForm(void)
     {
         int y = fy + i * (fh + g);
         CText6(lx, y + 6, T(labels[i]), INK);
-        CFill(vx, y, vw, fh, 52, 40, 22);
+        CFillInset(vx, y, vw, fh, 0);
         CFill(vx, y, vw, 1, GOLD); CFill(vx, y + fh - 1, vw, 1, GOLD);
         CFill(vx, y, 1, fh, GOLD); CFill(vx + vw - 1, y, 1, fh, GOLD);
-        CText6(vx + 6, y + 6, val[i], 236, 236, 210);
+        CText6(vx + 6, y + 6, val[i], INK);
     }
     int by = fy + 2 * (fh + g) + 10;
     KbKey(14,  by, 140, 32, T("From Search"), 4, 0);
@@ -3590,7 +3605,7 @@ static int GuideReader(const char *title, const char *body, int *scrollIO)
                 int trackH = rows * 13;
                 int barH = trackH * rows / g_glN; if (barH < 8) barH = 8;
                 int barY = WIN_Y + 28 + (trackH - barH) * scroll / maxScroll;
-                CFill(WIN_X + WIN_W - 15, WIN_Y + 28, 3, trackH, 40, 32, 20);
+                CFillInset(WIN_X + WIN_W - 15, WIN_Y + 28, 3, trackH, 1);
                 CFill(WIN_X + WIN_W - 15, barY, 3, barH, GOLD);
             }
             CText6Btn(WIN_X + 12, WIN_Y + WIN_H - 14, T("{DP} / {L}/{R} scroll   {B} back"), INK_DIM);
@@ -4404,7 +4419,7 @@ static void ToolChecklist(void)
             char totFrac[24]; int pct = totalAll > 0 ? totalDone * 100 / totalAll : 0;
             siprintf(totFrac, "%d/%d (%d%%)", totalDone, totalAll, pct);
             CText6(WIN_X + WIN_W - 12 - C6Width(totFrac), ty + 8, totFrac, GREEN_ON);
-            CFill(WIN_X + 12, ty + 20, WIN_W - 24, 5, 26, 20, 12);
+            CFillInset(WIN_X + 12, ty + 20, WIN_W - 24, 5, 1);
             int barw = totalAll > 0 ? (WIN_W - 24) * totalDone / totalAll : 0;
             CFill(WIN_X + 12, ty + 20, barw, 5, GREEN_ON);
             int lx = WIN_X + 12, ly = ty + 31;
@@ -4497,7 +4512,7 @@ static void ToolChecklist(void)
                 int gi = filtIdx[cursor];
                 const ChkItem *it = &cc->items[gi];
                 int bx = WIN_X + 12, by = WIN_Y + 34;
-                CFill(bx, by, 66, 66, 26, 20, 12); CFill(bx, by, 66, 1, GOLD); CFill(bx, by+65, 66, 1, GOLD);
+                CFillInset(bx, by, 66, 66, 0); CFill(bx, by, 66, 1, GOLD); CFill(bx, by+65, 66, 1, GOLD);
                 CFill(bx, by, 1, 66, GOLD); CFill(bx+65, by, 1, 66, GOLD);
                 DrawChkIcon(it, bx + 13, by + 13, 5); // 40px icon, centered in the 66px box
                 int tx = bx + 76;
@@ -4512,27 +4527,27 @@ static void ToolChecklist(void)
                 const u8 *statC = st == 1 ? CGREEN : st == 2 ? CGOLD : st == 3 ? CGOLD : CDIM;
                 u8 sc[3]; LiftForDark(statC[0], statC[1], statC[2], sc); // keep legible on the dark pill (dark-accent themes)
                 int svx = WIN_X + 86, svw = WIN_X + WIN_W - 12 - svx;
-                CFill(svx, ly2 - 2, svw, 14, 20, 16, 10);
+                CFillInset(svx, ly2 - 2, svw, 14, 1);
                 CFill(svx, ly2 - 2, svw, 1, sc[0], sc[1], sc[2]); CFill(svx, ly2+11, svw, 1, sc[0], sc[1], sc[2]);
                 CText6Clip(svx + (svw - C6Width(statTxt)) / 2, ly2, statTxt, svw - 6, sc[0], sc[1], sc[2]);
 
                 int hy = ly2 + 24;
                 CText6(WIN_X + 12, hy, T("Hint"), GOLD);
-                CText6Marquee(svx, hy, svw, it->hint, selTick, CHK_HINT_MARQUEE_DELAY, CHK_SPEED_FAST, 236, 236, 210);
+                CText6Marquee(svx, hy, svw, it->hint, selTick, CHK_HINT_MARQUEE_DELAY, CHK_SPEED_FAST, INK);
 
                 int oy = hy + 20;
                 CText6(WIN_X + 12, oy, T("Where"), GOLD);
-                if (!it->loc[0]) CText6(svx, oy, "-", 140, 130, 104);
+                if (!it->loc[0]) CText6(svx, oy, "-", INK_DIM);
                 else if (!revealLoc)
                 {
-                    CFill(svx, oy - 2, svw, 14, 20, 16, 10);
+                    CFillInset(svx, oy - 2, svw, 14, 1);
                     CFill(svx, oy - 2, svw, 1, GREEN_ON); CFill(svx, oy+11, svw, 1, GREEN_ON);
                     const char *lk = T("X: show location");
                     CText6Clip(svx + (svw - C6Width(lk)) / 2, oy, lk, svw - 6, GREEN_ON);
                 }
                 else
                 {
-                    CFill(svx, oy - 2, svw, 14, 20, 16, 10);
+                    CFillInset(svx, oy - 2, svw, 14, 1);
                     CFill(svx, oy - 2, svw, 1, GREEN_ON); CFill(svx, oy+11, svw, 1, GREEN_ON);
                     CText6Marquee(svx + 3, oy, svw - 6, it->loc, selTick, CHK_MARQUEE_DELAY, CHK_SPEED_FAST, GREEN_ON);
                 }
@@ -5220,6 +5235,34 @@ static void QuickMenu(void)
 }
 
 // ===================== Thread / entry =====================
+
+// Release everything we hold, in the reverse order we took it. Called when Luma tells us the
+// game is exiting, BEFORE we signal that the loader may continue.
+static void PluginShutdown(void)
+{
+    // If we are torn down with the menu open the game's threads are still suspended. Never let
+    // a process try to exit with its own threads frozen.
+    ResumeGame();
+
+    // Last chance to persist anything the user changed and we had not written yet.
+    if (configDirty) { ConfigSave(); configDirty = 0; }
+    if (favDirty)    { FavSave();    favDirty = 0; }
+
+    if (hidShmem && g_hidMem)          // touch-panel shared memory (manual hid:USER init)
+    {
+        svcUnmapMemoryBlock(g_hidMem, (u32)hidShmem);
+        svcCloseHandle(g_hidMem);
+        g_hidMem = 0; hidShmem = NULL; hidReady = 0;
+    }
+    if (fsReady)                            // SD archive + fs session
+    {
+        FSUSER_CloseArchive(cfgArchive);
+        fsExit();
+        fsReady = 0;
+    }
+    plgLdrExit();
+}
+
 void ThreadMain(void *arg)
 {
     InitThreadVars(); // must run before any newlib/hid/fs call on this thread
@@ -5251,6 +5294,18 @@ void ThreadMain(void *arg)
     {
         // 4ms while a toast is on screen (fast re-stamp), 20ms otherwise
         svcSleepThread((toastTicks > 0 ? 4 : 20) * 1000 * 1000);
+
+        // Luma signals onProcessExitEvent when the game is shutting down. The 3gx contract is:
+        // clean up, then signal resumeExitEvent so the loader can finish tearing the plugin
+        // down. main() asks for these two events - ignoring them afterwards leaves the loader
+        // waiting mid-teardown while our fs session, SD archive and shared-memory mappings are
+        // all still live, which is a good way to break the NEXT thing you launch.
+        if (onProcessExitEvent && svcWaitSynchronization(onProcessExitEvent, 0) == 0)
+        {
+            PluginShutdown();
+            if (resumeExitEvent) svcSignalEvent(resumeExitEvent);
+            svcExitThread();   // does not return
+        }
         u32 pad = HID_PAD, down = ARepeat(pad, &prev, &g_arHold);
 
         const QmCombo *qc = &qmCombos[qmCombo];
