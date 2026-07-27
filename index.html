@@ -47,6 +47,10 @@
   .btn:hover{border-color:#4b515b;background:#1f2228}
   .btn.primary{background:var(--ink);color:#101114;border-color:var(--ink)}
   .btn.primary:hover{background:#fff;border-color:#fff}
+  /* "Coming soon" state: inert, so it reads as a status and not a dead link. */
+  .btn.soon{background:transparent;color:var(--dim);border-color:var(--line);
+            cursor:default;letter-spacing:.06em;text-transform:uppercase;font-size:14px}
+  .btn.soon:hover{background:transparent;border-color:var(--line);color:var(--dim)}
   .meta{margin-top:14px;color:var(--dim);font-size:13.5px;font-family:var(--mono);min-height:1.4em}
   .meta b{color:var(--ok);font-weight:600}
 
@@ -90,12 +94,12 @@
       <span class="chip">any Title ID</span>
     </div>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/samaBR85/CTRComposer/releases">
-        Download the .3gx
-      </a>
+      <!-- No href on purpose: there is nothing to download yet. The script at the bottom turns
+           this back into a real download link the moment a release exists. -->
+      <a class="btn primary soon" id="dl">Coming soon</a>
       <a class="btn" href="https://github.com/samaBR85/CTRComposer">Source on GitHub</a>
     </div>
-    <div class="meta" id="meta">Loading release info…</div>
+    <div class="meta" id="meta">No binary published yet — build it from source</div>
     <img class="hero" src="screenshots/hero.png"
          alt="CTRComposer on a 3DS: the HOME menu on the top screen, the control legend on the bottom">
   </div>
@@ -206,8 +210,9 @@ make</code></pre>
 
 <script>
 (function () {
-  // The download button links to the Releases PAGE on purpose - the visitor picks the version
-  // and sees the notes. This script only fills in the "latest version / size / downloads" line.
+  // Fills in the "latest version / size / downloads" line - and DOES NOTHING when there are no
+  // releases yet, leaving the static "build it from source" text in the markup alone. So the
+  // moment a release is published this lights up on its own, with no edit here.
   var API = 'https://api.github.com/repos/samaBR85/CTRComposer/releases';
   var meta = document.getElementById('meta');
 
@@ -219,7 +224,7 @@ make</code></pre>
       return r.json();
     })
     .then(function (rels) {
-      if (!Array.isArray(rels) || !rels.length) throw new Error('no releases');
+      if (!Array.isArray(rels) || !rels.length) return;  // nothing published: keep the static text
 
       // Total downloads across EVERY release asset, not just the newest - otherwise the
       // counter silently resets to zero each time a new version is tagged.
@@ -231,6 +236,14 @@ make</code></pre>
       var latest = rels.find(function (r) { return !r.draft && !r.prerelease; }) || rels[0];
       var asset = (latest.assets || []).find(function (a) { return /\.3gx$/.test(a.name); });
 
+      // A release exists again - turn "Coming soon" back into a real download button.
+      var dl = document.getElementById('dl');
+      if (dl) {
+        dl.href = 'https://github.com/samaBR85/CTRComposer/releases';
+        dl.textContent = 'Download the .3gx';
+        dl.classList.remove('soon');
+      }
+
       var when = new Date(latest.published_at).toLocaleDateString('en-US',
                    { year: 'numeric', month: 'short', day: 'numeric' });
       var size = asset ? ' · ' + Math.round(asset.size / 1024) + ' KB' : '';
@@ -239,8 +252,8 @@ make</code></pre>
                        ' · <b>' + fmt(total) + '</b> download' + (total === 1 ? '' : 's');
     })
     .catch(function () {
-      // Unauthenticated GitHub API is rate-limited per IP; never leave a broken counter on screen.
-      meta.textContent = 'Latest release on GitHub';
+      // Unauthenticated GitHub API is rate-limited per IP. Leave whatever the markup says
+      // rather than replacing it with a claim we could not verify.
     });
 })();
 </script>
