@@ -26,8 +26,16 @@ Description: |
 
 Compatibility: Any
 
-# 5MiB leaves headroom for embedded guide text and Cheat Search snapshots.
-# 2MiB / 5MiB / 10MiB are the accepted values.
+# Accepted values: 2MiB / 5MiB / 10MiB.
+#
+# The engine itself needs ~619 KB (the compose buffer plus the two screen backups). What pushes
+# it higher is Cheat Search: opening it allocates 384 KB of candidates, 384 KB of undo, and a
+# 2 MB snapshot for unknown-value scans - about 3.4 MB at peak. Embedded guide text adds to the
+# binary, not the heap.
+#
+# Drop this to 2MiB if your plugin never uses the unknown-value Cheat Search - the reservation
+# is taken out of the GAME's memory whether the plugin uses it or not, so over-declaring costs
+# the game headroom for nothing.
 MemorySize: 5MiB
 
 UsePrivateMemory: false

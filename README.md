@@ -16,9 +16,37 @@ placeholders that write nothing until you enable them (see `EXAMPLE_ENABLED` in
 
 **[Project page](https://samabr85.github.io/CTRComposer/)**
 
-> **No prebuilt `.3gx` is published yet.** Build it yourself — see *Quick start* below. There is
-> an open issue with the plugin hanging the console on some game + NTR-CFW combinations, and
-> nothing gets shipped until that is understood.
+> **No prebuilt `.3gx` is published yet.** Build it yourself — see *Quick start* below.
+
+### Known issue: some games hang on relaunch with NTR-CFW
+
+On **Kirby: Triple Deluxe** (`000400000010BF00`) with **NTR-CFW streaming**, closing the game
+after using the plugin and reopening the *same* title hangs on the 3DS loading screen.
+
+This is **not specific to this template** — it reproduces identically with the original
+plugin this engine was extracted from, so it predates everything here. It is also **not** a
+general NTR problem: the same plugin under NTR on *Quiet, Please!* (`00040000001B3500`)
+relaunches fine. Without NTR, Kirby is fine too. It takes all three.
+
+**The cause is not known.** What has been ruled out, each by direct test on hardware:
+
+| Suspect | Test | Result |
+|---|---|---|
+| Something in this template | Original plugin, same game | Hangs identically |
+| Binary size / memory layout | 1.1 MB original vs 188 KB template | Both hang |
+| `MemorySize` reservation | 5 MiB vs 2 MiB | Both hang |
+| Touch / `hid:USER` shared memory | Never initialized (keypad unused) | Hangs anyway |
+| NTR-CFW on its own | Same plugin, different game | Fine |
+| The game on its own | Same game, plugin loader off | Fine |
+
+It takes all three at once — this engine, this game, NTR streaming — and merely opening and
+closing the menu is enough to trigger it. Everything the plugin does in that path is standard
+CTRComposer behaviour that works on other titles: three heap allocations, mapping the APT
+shared font, and pausing/resuming the game's threads.
+
+If you are building on this template and hit the same thing, the workaround is to not run NTR
+streaming on that title. Reports of other affected games are welcome — a second data point
+would narrow it a lot.
 
 <p align="center">
   <img src="screenshots/hero.png" alt="CTRComposer running on a 3DS: the HOME menu on the top screen and the control legend on the bottom" width="360">

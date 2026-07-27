@@ -20,8 +20,8 @@
 #define EXIT_HANDSHAKE 0
 
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
-#define PLUGIN_VER "v0.1.3 build 6"   // full string - About screen and pause box (have room)
-#define PLUGIN_TAG "b6"               // compact tag - cramped menu title bar
+#define PLUGIN_VER "v0.1.3 build 8"   // full string - About screen and pause box (have room)
+#define PLUGIN_TAG "b8"               // compact tag - cramped menu title bar
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
