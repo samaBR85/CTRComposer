@@ -14,6 +14,20 @@ It ships with **zero game art and zero game addresses**. The example cheats are 
 placeholders that write nothing until you enable them (see `EXAMPLE_ENABLED` in
 [`Sources/main.c`](Sources/main.c)).
 
+<p align="center">
+  <img src="screenshots/hero.png" alt="CTRComposer running on a 3DS: the HOME menu on the top screen and the control legend on the bottom" width="360">
+</p>
+
+Everything below is a real capture of this template running on hardware, with no game data of
+its own — the game behind the window is just whatever title it was loaded into.
+
+| | |
+|:--:|:--:|
+| <img src="screenshots/cheat_examples_01.png" width="300"><br>**Example cheats** — toggles get a checkbox, one-shot actions get a plain box. All inert until you add addresses. | <img src="screenshots/cheat_examples_02.png" width="300"><br>**Info box** (`X`) — per-item help, with `{HK}` swapped for the live hotkey glyph. |
+| <img src="screenshots/cheat_search.png" width="300"><br>**Cheat Search** — known/unknown value, scan types, region filter, one-step undo. | <img src="screenshots/hex_editor.png" width="300"><br>**Hex Editor** + the code-drawn keypad. A–F grey out in DEC mode; read-only memory is refused, not crashed. |
+| <img src="screenshots/checklist_01.png" width="300"><br>**Tracker** — per-item progress that syncs from memory. Ships with placeholder rows only. | <img src="screenshots/game_guide.png" width="300"><br>**Guide reader** — word-wrap, categories, and resume. Load pages from C or from the SD card. |
+| <img src="screenshots/settings.png" width="300"><br>**Settings** — theme, language, toast, and rebindable in-game hotkeys, all persisted. | <img src="screenshots/about.png" width="300"><br>**About** — text only. No logo image, so nothing third-party to inherit. |
+
 ## Quick start
 
 ```sh
