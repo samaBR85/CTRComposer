@@ -16,8 +16,8 @@
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
-#define PLUGIN_VER "v0.1.1 build 2"   // full string - About screen and pause box (have room)
-#define PLUGIN_TAG "b2"               // compact tag - cramped menu title bar
+#define PLUGIN_VER "v0.1.2 build 3"   // full string - About screen and pause box (have room)
+#define PLUGIN_TAG "b3"               // compact tag - cramped menu title bar
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
@@ -395,6 +395,7 @@ static void ConfigApply(const ConfigBlob *c); // fwd
 static void ConfigFill(ConfigBlob *c);        // fwd
 static void ApplyTheme(int idx);              // fwd (defined with the color state)
 static void LangLoad(void);                   // fwd (defined below with localization)
+static const char *HkExpand(const char *s, int cheat); // fwd
 static int  MemReadable(u32 a);               // fwd (defined with the Hex Editor)
 static int  MemWritable(u32 a);               // fwd
 
@@ -719,6 +720,35 @@ static void ConfigApply(const ConfigBlob *c)
     GuideLoad();
     g_firstRun = 0; // a valid config exists -> not the first launch
 }
+// Swap a {HK} token for the glyph token of whichever button the cheat's hotkey is bound to,
+// so a label or info card always shows the LIVE binding - rebind it in Settings and the text
+// follows. Strings with no {HK} are returned untouched, so this is safe to call on anything.
+//
+// Map your own hold-to-act cheats to their hotkey in the switch below.
+static const char *HkExpand(const char *s, int cheat)
+{
+    static char buf[2][256];
+    static int which = 0;
+    int hk;
+    switch (cheat)
+    {
+        case CH_EX_HOTKEY: hk = hk1; break;
+        default: return s;                  // not a hotkey cheat: nothing to substitute
+    }
+    if (!s) return s;
+    const char *gl = hotKeys[hk].glyph;     // e.g. "{Y}" - the text routines draw it as an icon
+    char *out = buf[which]; which ^= 1;
+    int o = 0;
+    for (int i = 0; s[i] && o < (int)sizeof(buf[0]) - 8; )
+    {
+        if (s[i] == '{' && s[i+1] == 'H' && s[i+2] == 'K' && s[i+3] == '}')
+        { for (int k = 0; gl[k] && o < (int)sizeof(buf[0]) - 1; ++k) out[o++] = gl[k]; i += 4; }
+        else out[o++] = s[i++];
+    }
+    out[o] = 0;
+    return out;
+}
+
 static void ConfigFill(ConfigBlob *c)
 {
     c->magic = CFG_MAGIC; c->version = CFG_VER;
@@ -1951,7 +1981,9 @@ static void DrawMenuItem(const Item *it, int x, int y, int cellW, int selected)
         CheckBoxIcon(x, y + 1, on);
         DrawCheatIcon(x + 17, y - 1, it->cheat);
         const u8 *c = on ? CGREEN : CINK;
-        CTextClipBtn(x + 37, y - 1, T(it->label), cellW - 53, c[0], c[1], c[2], 0);
+        // HkExpand so a {HK} in the label renders as the live button glyph instead of the
+        // literal token - CTextClipBtn then draws it as an icon like any other {A}/{B}.
+        CTextClipBtn(x + 37, y - 1, HkExpand(T(it->label), it->cheat), cellW - 53, c[0], c[1], c[2], 0);
         if (flashCheat == it->cheat)
         {
             int fx = x + cellW - 6 - C6Width(flashMsg);
@@ -2121,7 +2153,7 @@ static int g_resumeTool = -1;
 
 static void InfoBox(const Item *it)
 {
-    const char *ibLabel = it->label;
+    const char *ibLabel = HkExpand(it->label, it->cheat);
     const char *ibDesc  = it->desc;
     if (!ibDesc) return;
 
@@ -2129,23 +2161,9 @@ static void InfoBox(const Item *it)
     char lines[8][64];
     int nlines = 0;
 
-    const char *s = T(ibDesc);
-    // Live hotkey: features with a rebindable button carry a {HK} token in their desc; swap it for
-    // the currently-mapped glyph so the card always shows the real button (updates on next open).
-    char hkBuf[256];
-    if (it->cheat == CH_EX_HOTKEY)
-    {
-        const char *gl = hotKeys[hk1].glyph; // e.g. "{Y}"
-        int o = 0;
-        for (int i = 0; s[i] && o < (int)sizeof(hkBuf) - 8; )
-        {
-            if (s[i] == '{' && s[i+1] == 'H' && s[i+2] == 'K' && s[i+3] == '}')
-            { for (int k = 0; gl[k] && o < (int)sizeof(hkBuf) - 1; ++k) hkBuf[o++] = gl[k]; i += 4; }
-            else hkBuf[o++] = s[i++];
-        }
-        hkBuf[o] = 0;
-        s = hkBuf;
-    }
+    // Live hotkey: a rebindable feature carries a {HK} token in its desc; swap it for the
+    // currently-mapped glyph so the card always shows the real button.
+    const char *s = HkExpand(T(ibDesc), it->cheat);
     while (*s && nlines < 8)
     {
         int len = 0;
@@ -2831,8 +2849,8 @@ static void SearchDrawForm(void)
               p[0] = (u8)(((v>>11)&31)<<3); p[1] = (u8)(((v>>5)&63)<<2); p[2] = (u8)((v&31)<<3); }
             else { p[0] = p[1] = p[2] = 12; }
         }
-    // ...covered by a solid dark-brown panel so fields are always readable
-    CFillBlend(0, 0, BOT_W, BOT_H, BG, 230); // ~80% opaque
+    // ...covered by a mostly-opaque themed panel so fields are always readable
+    CFillBlend(0, 0, BOT_W, BOT_H, BG, 230); // ~90% opaque
     CFill(6, 4, BOT_W - 12, 1, GOLD); CFill(6, BOT_H - 6, BOT_W - 12, 1, GOLD);
 
     CText(14, 8, T("Cheat Search"), GOLD, 1);
@@ -2857,10 +2875,17 @@ static void SearchDrawForm(void)
         int y = fy + i * (fh + g);
         CText6(lx, y + 4, T(labels[i]), INK);
         int dim = dims[i];
-        CFill(vx, y, vw, fh, dim ? 26 : 52, dim ? 20 : 40, dim ? 12 : 22);
+        // Field face derived from the THEME, same lift trick as the keypad keys: raise the
+        // background (or sink it on a light theme) so the box reads as an input, and flatten it
+        // back toward the background when the field is locked. These were hardcoded olive
+        // values left over from the original palette, which ignored the theme entirely.
+        int lift = ThemeBgLight() ? -26 : 28;
+        if (dim) lift /= 3;
+        CFill(vx, y, vw, fh, ClampU8(CBG[0] + lift), ClampU8(CBG[1] + lift), ClampU8(CBG[2] + lift));
         CFill(vx, y, vw, 1, GOLD); CFill(vx, y + fh - 1, vw, 1, GOLD);
         CFill(vx, y, 1, fh, GOLD); CFill(vx + vw - 1, y, 1, fh, GOLD);
-        CText6(vx + 6, y + 4, val[i], dim ? 120 : 236, dim ? 116 : 236, dim ? 96 : 210);
+        const u8 *fc = dim ? CDIM : CINK;
+        CText6(vx + 6, y + 4, val[i], fc[0], fc[1], fc[2]);
     }
     int by = fy + 5 * (fh + g) + 8;
     KbKey(14,  by, 93, 28, g_searchStarted ? T("Next") : T("Search"), 5, 0);
