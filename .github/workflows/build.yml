@@ -43,8 +43,11 @@ jobs:
             /opt/devkitpro/tools/bin/3gxtool
           3gxtool | head -n 3
 
+      # NOT parallel: the devkitPro Makefile template recurses into build/ and its link rule
+      # races the compile rules under -j, so `make -j` intermittently fails with
+      # "cannot find main.o". It is five source files - serial costs nothing.
       - name: Build
-        run: make -j"$(nproc)"
+        run: make
 
       - name: Verify artifact
         run: |
