@@ -15,7 +15,7 @@ placeholders that write nothing until you enable them (see `EXAMPLE_ENABLED` in
 [`Sources/main.c`](Sources/main.c)).
 
 **[Project page](https://samabr85.github.io/CTRComposer/)** ·
-**[Download the latest `.3gx`](https://github.com/samaBR85/CTRComposer/releases/latest)**
+**Latest `.3gx`** under the *Releases* tab of this repository
 
 <p align="center">
   <img src="screenshots/hero.png" alt="CTRComposer running on a 3DS: the HOME menu on the top screen and the control legend on the bottom" width="360">
