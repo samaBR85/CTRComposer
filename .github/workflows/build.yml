@@ -12,6 +12,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Needed by the "Attach to release" step: the default GITHUB_TOKEN is read-only in
+    # many repositories, and creating a Release requires write access to contents.
+    permissions:
+      contents: write
     # Official devkitPro image: ships devkitARM + libctru and sets $DEVKITARM.
     # devkitPro asks that CI use these images rather than running pacman directly.
     container: devkitpro/devkitarm:latest
