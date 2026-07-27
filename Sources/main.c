@@ -16,8 +16,8 @@
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
 #define PLUGIN_NAME "CTRComposer"     // shown on the pause card and the About screen
-#define PLUGIN_VER "v0.1.0 build 1"   // full string - About screen and pause box (have room)
-#define PLUGIN_TAG "b1"               // compact tag - cramped menu title bar
+#define PLUGIN_VER "v0.1.1 build 2"   // full string - About screen and pause box (have room)
+#define PLUGIN_TAG "b2"               // compact tag - cramped menu title bar
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
@@ -280,10 +280,13 @@ static void GrabFb(void)
 // reuse the same row-drawing code, which is why they live in the same enum.
 enum {
     // ---- EXAMPLE cheats: replace these with your game's ----
-    CH_EX_DIRECT,     // continuous: direct write to a fixed address
+    CH_EX_DIRECT,     // continuous: direct u16 write to a fixed address
+    CH_EX_BYTE,       // continuous: u8 write
+    CH_EX_WORD,       // continuous: u32 write
     CH_EX_BASEOFF,    // continuous: base pointer + offset write
     CH_EX_HOTKEY,     // continuous: only while a rebindable hotkey is held
     CH_EX_ONESHOT,    // one-shot: applied once, when you select it
+    CH_EX_ONESHOT2,   // one-shot with a custom result message
     // ---- Settings rows (not cheats) ----
     CH_CFG_TOAST, CH_CFG_AUTOFILL, CH_CFG_QMKEY, CH_CFG_HK1, CH_CFG_HK2,
     CH_CFG_HKRESET, CH_CFG_THEME, CH_CFG_LANG,
@@ -392,6 +395,8 @@ static void ConfigApply(const ConfigBlob *c); // fwd
 static void ConfigFill(ConfigBlob *c);        // fwd
 static void ApplyTheme(int idx);              // fwd (defined with the color state)
 static void LangLoad(void);                   // fwd (defined below with localization)
+static int  MemReadable(u32 a);               // fwd (defined with the Hex Editor)
+static int  MemWritable(u32 a);               // fwd
 
 // ===================== Localization (gettext-style: English source = key) =====================
 // UI strings are wrapped in T("English"). At runtime T() looks the English text up in
@@ -778,6 +783,18 @@ static int OneShot(int id)
             else g_oneShotMsg = "EXAMPLE";  // nothing written: see EXAMPLE_ENABLED above
             return 1;
 
+        // Same thing, but reporting a RESULT. A toggle-style one-shot (flip a bit, then read
+        // it back) can say which way it went, so the flash is unambiguous instead of a bare OK.
+        case CH_EX_ONESHOT2:
+            if (EXAMPLE_ENABLED)
+            {
+                u8 v = (u8)(R8(EXAMPLE_ADDR_ONESHOT) ^ 0x01);
+                W8(EXAMPLE_ADDR_ONESHOT, v);
+                g_oneShotMsg = (v & 0x01) ? "ADDED" : "REMOVED";
+            }
+            else g_oneShotMsg = "EXAMPLE";
+            return 1;
+
         // Add your one-shots here:
         //   case CH_MY_CHEAT: W16(0x00123456, 0x0064); return 1;
         //
@@ -825,8 +842,13 @@ static void ApplyCheats(void)
     u32 pad = HID_PAD;
 
     // EXAMPLE - direct write. Pins a value for as long as the cheat is on.
+    // W8 / W16 / W32 pick the width; match whatever the game actually stores there.
     if (cheatState[CH_EX_DIRECT])
         W16(EXAMPLE_ADDR_DIRECT, EXAMPLE_VALUE_DIRECT);
+    if (cheatState[CH_EX_BYTE])
+        W8(EXAMPLE_ADDR_DIRECT, 0x63);           // 99, the classic "max this counter"
+    if (cheatState[CH_EX_WORD])
+        W32(EXAMPLE_ADDR_DIRECT, 0x0000270F);    // 9999
 
     // EXAMPLE - base+offset write. ALWAYS null-check the base before writing through it.
     if (cheatState[CH_EX_BASEOFF])
@@ -859,6 +881,23 @@ enum { PK_EXAMPLE, NUM_PICKERS };
 static const Picker pickers[NUM_PICKERS] = {
     { "Example Slot", exampleOpts, (int)(sizeof(exampleOpts)/sizeof(exampleOpts[0])), EXAMPLE_ADDR_DIRECT },
 };
+
+// A picker points at a GAME address, and that address is a placeholder (0) until you fill it
+// in - and even then it can be wrong, or unmapped in the current scene. NEVER dereference it
+// blind: an unmapped read on the 3DS is a data abort that hard-freezes the console, with the
+// menu still on screen. These two wrap every picker access.
+static int PickerRead(const Picker *pk, u8 *out)
+{
+    if (!pk->addr || !MemReadable(pk->addr)) return 0;
+    *out = R8(pk->addr);
+    return 1;
+}
+static int PickerWrite(const Picker *pk, u8 v)
+{
+    if (!pk->addr || !MemWritable(pk->addr)) return 0;
+    W8(pk->addr, v);
+    return 1;
+}
 
 // ===================== Menu model (folders) =====================
 // A layout-agnostic data model: DrawMenuItem() renders ONE row/cell wherever you put it,
@@ -903,20 +942,29 @@ static const Item toolsItems[] = {
 
 // EXAMPLE cheats - these demonstrate the four shapes a cheat can take. Delete them and
 // write your own; the descriptions are what the info box ({X}) shows.
+// EVERY row here is INERT: EXAMPLE_ENABLED is 0, so toggling them writes nothing at all.
+// They exist so you can walk the menu - navigation, auto-repeat, the {X} info box, {Y}
+// favorites, toasts, the checkbox-vs-action distinction - before you have a single address.
 static const Item exampleItems[] = {
-    IT_SEP("CONTINUOUS"),
+    IT_SEP("CONTINUOUS (toggles)"),
     IT_CHEAT("Example: direct write",  CH_EX_DIRECT,
-             "EXAMPLE - does nothing until you edit it. Writes a fixed value to a fixed address every frame while it is on. The simplest kind of cheat: see EXAMPLE_ADDR_DIRECT in Sources/main.c."),
+             "EXAMPLE - inert until you edit it. Writes a fixed 16-bit value to a fixed address every frame while it is on. The simplest kind of cheat: see EXAMPLE_ADDR_DIRECT in Sources/main.c."),
+    IT_CHEAT("Example: byte write",    CH_EX_BYTE,
+             "EXAMPLE - inert until you edit it. Same idea, but 8-bit. Match the write width (W8 / W16 / W32) to whatever the game actually stores at that address, or you will clobber the bytes next door."),
+    IT_CHEAT("Example: 32-bit write",  CH_EX_WORD,
+             "EXAMPLE - inert until you edit it. A 32-bit write, for counters and pointers that are a full word wide."),
     IT_CHEAT("Example: base + offset", CH_EX_BASEOFF,
-             "EXAMPLE - does nothing until you edit it. Reads a pointer to the player struct, then writes a field at a fixed offset inside it. Always null-check the base first."),
+             "EXAMPLE - inert until you edit it. Reads a pointer to the player struct, then writes a field at a fixed offset inside it. ALWAYS null-check the base before writing through it."),
     IT_CHEAT("Example: hold {HK}",     CH_EX_HOTKEY,
-             "EXAMPLE - does nothing until you edit it. Only acts while you hold {HK} in game. Rebind that button in Settings; this text shows the live binding."),
-    IT_SEP("ONE-SHOT"),
+             "EXAMPLE - inert until you edit it. Only acts while you hold {HK} in game. Rebind that button in Settings - this text shows the live binding, because the token is swapped for the real glyph when the card opens."),
+    IT_SEP("ONE-SHOT (actions)"),
     IT_CHEAT("Example: apply once",    CH_EX_ONESHOT,
-             "EXAMPLE - does nothing until you edit it. Applied once, the moment you press {A} on it, instead of every frame. Use this for 'give me the item' style cheats."),
+             "EXAMPLE - inert until you edit it. Applied once, the moment you press {A}, instead of every frame. Use this for 'give me the item' style cheats. Note it gets a plain box, not a checkbox: it has no on/off state."),
+    IT_CHEAT("Example: toggle a bit",  CH_EX_ONESHOT2,
+             "EXAMPLE - inert until you edit it. A one-shot that flips a bit and then reads it back, so the flash says ADDED or REMOVED instead of just OK. Good for equipment-style cheats."),
     IT_SEP("PICKER"),
     IT_PICKER("Example: pick a value", PK_EXAMPLE,
-              "EXAMPLE - does nothing until you edit it. Opens a list and writes the value you choose to one address."),
+              "EXAMPLE - inert until you edit it. Opens a list and writes the value you choose to one address. Because the address is still a placeholder, it will refuse the write and say so rather than poking address zero."),
 };
 
 static const Item settingsItems[] = {
@@ -1067,7 +1115,7 @@ static void FavLoad(void)
 }
 
 
-// ===================== CTRPF-style rendering (parchment window) =====================
+// ===================== CTRPF-style rendering (themed window) =====================
 #define WIN_X   40
 #define WIN_Y   20
 #define WIN_W   320
@@ -1079,12 +1127,17 @@ static void FavLoad(void)
 #define MAX_ROWS 9
 
 // Live theme: the color macros expand to runtime arrays, so switching a theme
-// just rewrites these and every CFill/CText call follows. Defaults = THEMES[0].
-static u8 CINK[3]   = { 248, 240, 216 };
-static u8 CDIM[3]   = { 196, 180, 150 };
-static u8 CGOLD[3]  = { 236, 200, 120 };
-static u8 CGREEN[3] = { 140, 236, 120 };
-static u8 CBG[3]    = { 70, 55, 34 };
+// just rewrites these and every CFill/CText call follows.
+//
+// These initializers mirror THEMES[0] only as a safety net. The AUTHORITY is the
+// ApplyTheme(g_themeIdx) call in ThreadMain, which runs before anything is drawn - so a
+// fresh install with no Settings.cfg still comes up on THEMES[0] instead of whatever
+// happens to be hard-coded here. Do not rely on these values.
+static u8 CINK[3]   = { 242, 242, 242 };
+static u8 CDIM[3]   = { 150, 150, 150 };
+static u8 CGOLD[3]  = { 230, 230, 230 };
+static u8 CGREEN[3] = { 200, 200, 200 };
+static u8 CBG[3]    = { 18, 18, 20 };
 #define INK      CINK[0],   CINK[1],   CINK[2]
 #define INK_DIM  CDIM[0],   CDIM[1],   CDIM[2]
 #define GOLD     CGOLD[0],  CGOLD[1],  CGOLD[2]
@@ -1235,7 +1288,8 @@ static int IsToggleCheat(int id)
 {
     switch (id)
     {
-        case CH_EX_DIRECT: case CH_EX_BASEOFF: case CH_EX_HOTKEY:
+        case CH_EX_DIRECT: case CH_EX_BYTE: case CH_EX_WORD:
+        case CH_EX_BASEOFF: case CH_EX_HOTKEY:
             return 1;
         default: return 0;
     }
@@ -1826,16 +1880,17 @@ static void DrawMenuItem(const Item *it, int x, int y, int cellW, int selected)
     else if (it->picker >= 0)
     {
         const Picker *pk = &pickers[it->picker];
-        u8 cur = R8(pk->addr);
+        u8 cur;
         GridIcon(x, y - 1);
-        for (int k = 0; k < pk->count; ++k)
-            if (pk->opts[k].val == cur)
-            {
-                int cw = CTextWidth(T(pk->opts[k].name));
-                CText(x + cellW - 6 - cw, y - 1, T(pk->opts[k].name), GREEN_ON, 0);
-                CTextClip(x + 20, y - 1, T(it->label), cellW - 32 - cw, INK, 0);
-                goto pickdone;
-            }
+        if (PickerRead(pk, &cur))
+            for (int k = 0; k < pk->count; ++k)
+                if (pk->opts[k].val == cur)
+                {
+                    int cw = CTextWidth(T(pk->opts[k].name));
+                    CText(x + cellW - 6 - cw, y - 1, T(pk->opts[k].name), GREEN_ON, 0);
+                    CTextClip(x + 20, y - 1, T(it->label), cellW - 32 - cw, INK, 0);
+                    goto pickdone;
+                }
         CTextClip(x + 20, y - 1, T(it->label), cellW - 26, INK, 0);
         pickdone:;
     }
@@ -2156,9 +2211,13 @@ static void InfoBox(const Item *it)
 static void PickerRun(const Picker *pk)
 {
     int cursor = 0, scroll = 0, changed = 1;
-    u8 cur = R8(pk->addr);
-    for (int k = 0; k < pk->count; ++k)
-        if (pk->opts[k].val == cur) { cursor = k; break; }
+    u8 cur = 0;
+    // 0 = address not set or not mapped right now. When that happens we still show the list
+    // (so you can see the options), just with nothing marked as the current value.
+    int haveCur = PickerRead(pk, &cur);
+    if (haveCur)
+        for (int k = 0; k < pk->count; ++k)
+            if (pk->opts[k].val == cur) { cursor = k; break; }
 
     u32 prev = HID_PAD;
 
@@ -2185,9 +2244,9 @@ static void PickerRun(const Picker *pk)
                 }
                 // No sprite sheet in the template - a filled swatch stands in for the
                 // per-option icon. Swap in DrawScaled() here once you have real art.
-                const u8 *sw = (pk->opts[i].val == cur) ? CGREEN : CDIM;
+                const u8 *sw = (haveCur && pk->opts[i].val == cur) ? CGREEN : CDIM;
                 CFill(ROW_X + 2, y + 1, 12, 12, sw[0], sw[1], sw[2]);
-                const u8 *oc = (pk->opts[i].val == cur) ? CGREEN : CINK;
+                const u8 *oc = (haveCur && pk->opts[i].val == cur) ? CGREEN : CINK;
                 CTextClip(ROW_X + 20, y - 1, T(pk->opts[i].name), listW - 20, oc[0], oc[1], oc[2], 0);
             }
 
@@ -2222,8 +2281,10 @@ static void PickerRun(const Picker *pk)
         if (down & (BUTTON_LEFT | BUTTON_L1))  { cursor -= MAX_ROWS; if (cursor < 0) cursor = 0; changed = 1; }
         if (down & BUTTON_A)
         {
-            W8(pk->addr, pk->opts[cursor].val);
-            QueueToastRaw(T(pk->opts[cursor].name), T(": SET"));
+            if (PickerWrite(pk, pk->opts[cursor].val))
+                QueueToastRaw(T(pk->opts[cursor].name), T(": SET"));
+            else
+                QueueToastRaw(T("Address not set"), ""); // placeholder / unmapped: refuse, don't crash
             break;
         }
         if (down & BUTTON_SELECT) g_quitToGame = 1;
@@ -2948,14 +3009,21 @@ static void ToolAbout(void)
     static const struct { const char *s; int gold; } lines[] = {
         // EDIT ME - this is your plugin's credits screen. It is deliberately TEXT ONLY:
         // the blank template ships no logo image, so there is no third-party art to inherit.
+        //
+        // Replace the "Your plugin" block with your own name and repo. Please KEEP the
+        // "CTRComposer engine" block - that is the attribution for the engine you are
+        // building on, the same way the engine credits Luma3DS and PabloMK7 below it.
         { PLUGIN_NAME " Blank Template", 1 },
         { PLUGIN_VER,                    0 },
         { "",                            0 },
-        { "Built on the CTRComposer engine:",       0 },
-        { "a raw .3gx overlay for the 3DS.",        0 },
-        { "",                            0 },
         { "Your plugin: Your Name",      1 },
         { "github.com/you/your-plugin",  0 },
+        { "",                            0 },
+        { "CTRComposer engine",          1 },
+        { "A raw .3gx overlay engine for",          0 },
+        { "the 3DS - no CTRPluginFramework.",       0 },
+        { "Made by samaBR",              1 },
+        { "github.com/samaBR85/CTRComposer",        0 },
         { "",                            0 },
         { "Engine credits",              1 },
         { "Inspired by CTRPluginFramework",         0 },
@@ -5146,6 +5214,9 @@ void ThreadMain(void *arg)
     savedTop = (u16 *)malloc(TOP_W * TOP_H * 2);
     PlgDirInit(); // work out luma/plugins/<TitleID>/ from the loader-supplied path (do this FIRST:
                   // every load/save below builds its path from it)
+    ApplyTheme(0); // seed the live colors from THEMES[0] BEFORE anything can draw. Without this a
+                   // fresh install (no Settings.cfg -> ConfigLoad never calls ApplyTheme) would run
+                   // on whatever the CINK/CBG initializers happen to hold.
     ConfigLoad(); // restore toast toggle + quick-menu hotkey + theme + language from SD
     FavLoad();    // restore favorites (own label-keyed file, survives cheat-list changes)
 
