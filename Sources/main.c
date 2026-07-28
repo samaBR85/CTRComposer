@@ -15,6 +15,23 @@
 // is your confirmation that the .3gx actually on the SD card is the one you just compiled.
 // Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
 // you debugging a stale binary.
+// TOOLS-ONLY BUILD, for use as Luma's universal plugin: /luma/plugins/default.3gx
+//
+// Luma falls back to that file for ANY title with no plugin folder of its own, so one build
+// follows you into every game. Cheats cannot work that way - an address is specific to one game
+// and one region - but the memory TOOLS are completely game-agnostic, and those are what is
+// worth having everywhere.
+//
+// Set to 1 and the menu drops the per-game furniture (the example cheats, the tracker, the game
+// guide) and surfaces Cheat Search / RAM Dumper / Hex Editor directly on HOME. Nothing else
+// about the engine changes.
+//
+// Note that as default.3gx the plugin loads into EVERYTHING - the Home Menu, applets, homebrew -
+// not just games, and it flips the host process to RWX and pauses its threads like it does
+// anywhere else. That is a much broader blast radius than a single title. Treat it as
+// experimental.
+#define TOOLS_ONLY 0
+
 // Opt-in: respond to Luma's process-exit event and tear the plugin down before the game dies.
 //
 // OFF because it was MEASURED not to work - see the block in ThreadMain. Left in the tree
@@ -943,6 +960,21 @@ static void ToolRun(int t); // fwd
 #define IT_SEP(lbl)            { lbl, -2, -1, -1, NULL, -1, 0 } // non-selectable section header
 #define IS_SEP(it)             ((it)->cheat == -2)
 
+#if TOOLS_ONLY
+// Universal build: the tools ARE the plugin, so they go straight on HOME with no folder to
+// dig through. No cheats, no tracker, no game guide - none of those can mean anything when the
+// same binary loads into every title on the system.
+static const Item rootItems[] = {
+    IT_SEP("MEMORY TOOLS"),
+    IT_TOOL_WIDE("Cheat Search", T_SEARCH,  "Search this game's RAM for a value, then narrow it down (greater/less/changed...) to find its address. Poke results directly. Works on any title - it scans memory, it doesn't need to know the game."),
+    IT_TOOL("RAM Dumper",   T_RAMDUMP, "Save a block of memory to a .bin on the SD card. Pick a start address and size, or pull the address from Cheat Search."),
+    IT_TOOL("Hex Editor",   T_HEXEDIT, "Browse memory as a live hex grid and edit any byte on the spot. Read-only regions are protected."),
+    IT_SEP("SYSTEM"),
+    IT_TOOL("Plugin Guide", T_PLUGINGUIDE, "How to use this plugin: the menu, the quick menu, and the memory tools."),
+    IT_TOOL("About",        T_ABOUT,   "Plugin info and credits."),
+    IT_FOLDER("Settings",   F_SETTINGS),
+};
+#else
 static const Item rootItems[] = {
     IT_SEP("CHEATS"),
     IT_FOLDER("Examples", F_EXAMPLES),
@@ -954,6 +986,7 @@ static const Item rootItems[] = {
     IT_FOLDER("Tools",    F_TOOLS),
     IT_FOLDER("Settings", F_SETTINGS),
 };
+#endif
 static const Item toolsItems[] = {
     IT_TOOL("Cheat Search", T_SEARCH,  "Search the game's RAM for a value, then narrow it down (greater/less/changed...) to find its address. Poke results directly."),
     IT_TOOL("RAM Dumper",   T_RAMDUMP, "Save a block of the game's memory to a .bin file on the SD card. Pick a start address and size, or pull the address from Cheat Search."),
@@ -992,18 +1025,26 @@ static const Item settingsItems[] = {
     IT_SEP("GENERAL"),
     IT_CHEAT("Change Theme", CH_CFG_THEME, "Recolor every menu live. The template ships one neutral theme; add your own to THEMES[] in Includes/themes.h. Your pick is saved."),
     IT_CHEAT("Language", CH_CFG_LANG, "Press {A} to cycle the menu language. Translations load from <plugin folder>/lang/. The template ships English only."),
-    IT_CHEAT("Toggle notifications (toast)", CH_CFG_TOAST, "Shows a small notification in-game when a cheat is toggled."),
+    IT_CHEAT("Toggle notifications (toast)", CH_CFG_TOAST, "Shows a small notification in-game when something is toggled."),
+#if !TOOLS_ONLY
     IT_CHEAT("Auto-fill Tracker on open", CH_CFG_AUTOFILL, "When on, the Tracker syncs itself from game memory every time you open it."),
+#endif
     IT_SEP("IN-GAME HOTKEYS"),
     IT_CHEAT("Quick Menu hotkey", CH_CFG_QMKEY, "Press {A} to cycle the button combo that opens the quick menu in game."),
+#if !TOOLS_ONLY
     IT_CHEAT("Example hotkey 1", CH_CFG_HK1, "Press {A} to cycle the button used by the 'hold' example cheat."),
     IT_CHEAT("Example hotkey 2", CH_CFG_HK2, "Press {A} to cycle a second in-game hotkey. Wire it to one of your own cheats."),
+#endif
     IT_CHEAT("Reset hotkeys to default", CH_CFG_HKRESET, "Press {A} to restore the Quick Menu and example hotkeys to their defaults ({L}+SELECT / {Y} / {X})."),
 };
 
 #define FCOUNT(a) (int)(sizeof(a) / sizeof((a)[0]))
 static const Folder folders[NUM_FOLDERS] = {
+#if TOOLS_ONLY
+    { "CTRComposer Tools",    rootItems,     FCOUNT(rootItems) },
+#else
     { "CTRComposer Template", rootItems,     FCOUNT(rootItems) },
+#endif
     { "Examples",             exampleItems,  FCOUNT(exampleItems) },
     { "Tools",                toolsItems,    FCOUNT(toolsItems) },
     { "Settings",             settingsItems, FCOUNT(settingsItems) },
