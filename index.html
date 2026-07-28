@@ -75,6 +75,17 @@
 
   .note{border-left:2px solid var(--line);padding:2px 0 2px 16px;color:var(--dim);font-size:14.5px}
 
+  /* the two-build chooser */
+  .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-bottom:28px}
+  .pick{border:1px solid var(--line);border-radius:10px;padding:22px 22px 18px;background:var(--panel)}
+  .pick h3{margin:.15em 0 .35em;font-size:19px;letter-spacing:-.01em;word-break:break-word}
+  .pick-k{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.04em}
+  .pick-l{margin:0 0 14px;color:var(--ink);font-weight:600}
+  .pick p{font-size:14.5px;color:var(--dim);margin:0 0 12px}
+  .pick p b{color:var(--ink)}
+  .pick-w{border-top:1px solid var(--line);padding-top:12px}
+  .pick-p{font-family:var(--mono);font-size:12.5px;margin-bottom:0!important}
+
   footer{padding:40px 0 64px;color:var(--dim);font-size:13.5px;text-align:center}
   footer a{color:var(--dim)}
   @media (max-width:560px){ section{padding:40px 0} }
@@ -120,6 +131,52 @@
        are inert — they write nothing until you set <code>EXAMPLE_ENABLED</code> to 1 and fill in
        real addresses. The button glyphs are original, generated from primitives by a script in
        the repo.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Two builds. Which one do you want?</h2>
+    <p class="sub">Same engine, from the same source tree. The difference is who is holding it.</p>
+
+    <div class="two">
+      <div class="pick">
+        <div class="pick-k">🔧 For developers</div>
+        <h3>CTRComposer-BlankTemplate.3gx</h3>
+        <p class="pick-l">Build a plugin for <em>one</em> game.</p>
+        <p>You edit C, and in exchange you get the whole engine free: folder menus, live themes,
+           on-screen keypad, inline button glyphs, SD persistence, localization, a favourites
+           quick menu, a guide reader, a progress tracker, and the four memory tools.</p>
+        <p>What you add is the part no engine can give you — <b>your game's addresses</b>.
+           Everything else is already written.</p>
+        <p class="pick-w">Pick this if you want a cheat menu for a specific game, you're reviving
+           an old <code>.plg</code> that no longer loads, or you want an overlay UI for a homebrew
+           idea of your own.</p>
+        <p class="pick-p">Installs to <code>luma/plugins/&lt;TitleID&gt;/</code></p>
+      </div>
+
+      <div class="pick">
+        <div class="pick-k">🔎 For players &amp; explorers</div>
+        <h3>default.3gx</h3>
+        <p class="pick-l">Memory tools in <em>every</em> game. No code.</p>
+        <p>Drop one file on the SD card and every title on the system gains <b>Cheat Search</b>, a
+           <b>RAM Dumper</b> and a <b>Hex Editor</b> on <kbd>SELECT</kbd>. Nothing to compile,
+           nothing to configure, no Title ID to look up.</p>
+        <p>It carries <b>no cheats</b> — that is a fact about reality, not a missing feature. A
+           cheat is a memory address, and an address belongs to one game <em>and one region</em>.
+           The tooling is what's genuinely universal, so the tooling is what it carries.</p>
+        <p class="pick-w">Pick this if you want to poke at any game without writing code, you're
+           hunting addresses before deciding to build a plugin, or you just want a permanent hex
+           editor on the console.</p>
+        <p class="pick-p">Installs to <code>luma/plugins/default.3gx</code> — the root, not a game folder.</p>
+      </div>
+    </div>
+
+    <p class="note"><b>They compose, and a per-game plugin always wins.</b> Luma only falls back to
+       <code>default.3gx</code> for titles with no folder of their own, so your own plugin runs
+       where you built one and the toolkit covers everything else. The natural workflow is exactly
+       that order: hunt addresses anywhere with the toolkit, then build the real plugin from the
+       template once you have them.</p>
   </div>
 </section>
 
