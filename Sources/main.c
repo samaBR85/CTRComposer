@@ -645,7 +645,9 @@ static void GuideLoad(void)
     }
 }
 
+#if !TOOLS_ONLY
 static const GuideCat  *GG_Cats(int *n);   // fwd (defined with the Plugin Guide, after PLUGIN_PAGES)
+#endif
 static const GuidePage *PG_Pages(int *n);  // fwd
 
 static void ConfigLoad(void)
@@ -944,12 +946,19 @@ static int PickerWrite(const Picker *pk, u8 v)
 typedef struct { const char *label; int cheat; int folder; int picker; const char *desc; int tool; u8 wide; } Item;
 typedef struct { const char *title; const Item *items; int count; } Folder;
 
-enum {
-    F_ROOT, F_EXAMPLES, F_TOOLS, F_SETTINGS, NUM_FOLDERS
-};
+#if TOOLS_ONLY
+enum { F_ROOT, F_SETTINGS, NUM_FOLDERS };
+#else
+enum { F_ROOT, F_EXAMPLES, F_TOOLS, F_SETTINGS, NUM_FOLDERS };
+#endif
 
-// tool screens
+// tool screens. The tools-only build drops the two that are inherently per-game, so their
+// code, their data tables and their menu rows all disappear from that binary.
+#if TOOLS_ONLY
+enum { T_SEARCH, T_RAMDUMP, T_HEXEDIT, T_ABOUT, T_PLUGINGUIDE, NUM_TOOLS };
+#else
 enum { T_SEARCH, T_RAMDUMP, T_HEXEDIT, T_ABOUT, T_GAMEGUIDE, T_PLUGINGUIDE, T_TRACKER, NUM_TOOLS };
+#endif
 static void ToolRun(int t); // fwd
 
 #define IT_CHEAT(lbl, ch, d)   { lbl, ch, -1, -1, d, -1, 0 }
@@ -987,6 +996,7 @@ static const Item rootItems[] = {
     IT_FOLDER("Settings", F_SETTINGS),
 };
 #endif
+#if !TOOLS_ONLY
 static const Item toolsItems[] = {
     IT_TOOL("Cheat Search", T_SEARCH,  "Search the game's RAM for a value, then narrow it down (greater/less/changed...) to find its address. Poke results directly."),
     IT_TOOL("RAM Dumper",   T_RAMDUMP, "Save a block of the game's memory to a .bin file on the SD card. Pick a start address and size, or pull the address from Cheat Search."),
@@ -994,8 +1004,8 @@ static const Item toolsItems[] = {
     IT_TOOL("About",        T_ABOUT,   "Plugin info and credits."),
 };
 
-// EXAMPLE cheats - these demonstrate the four shapes a cheat can take. Delete them and
-// write your own; the descriptions are what the info box ({X}) shows.
+// EXAMPLE cheats - these demonstrate the shapes a cheat can take. Delete them and write your
+// own; the descriptions are what the info box ({X}) shows.
 // EVERY row here is INERT: EXAMPLE_ENABLED is 0, so toggling them writes nothing at all.
 // They exist so you can walk the menu - navigation, auto-repeat, the {X} info box, {Y}
 // favorites, toasts, the checkbox-vs-action distinction - before you have a single address.
@@ -1020,11 +1030,17 @@ static const Item exampleItems[] = {
     IT_PICKER("Example: pick a value", PK_EXAMPLE,
               "EXAMPLE - inert until you edit it. Opens a list and writes the value you choose to one address. Because the address is still a placeholder, it will refuse the write and say so rather than poking address zero."),
 };
+#endif // !TOOLS_ONLY
 
 static const Item settingsItems[] = {
     IT_SEP("GENERAL"),
+#if TOOLS_ONLY
+    IT_CHEAT("Change Theme", CH_CFG_THEME, "Recolor every menu live. Your pick is saved to the SD card."),
+    IT_CHEAT("Language", CH_CFG_LANG, "Press {A} to cycle the menu language. Translations load from the plugin folder, under lang/. English is built in."),
+#else
     IT_CHEAT("Change Theme", CH_CFG_THEME, "Recolor every menu live. The template ships one neutral theme; add your own to THEMES[] in Includes/themes.h. Your pick is saved."),
     IT_CHEAT("Language", CH_CFG_LANG, "Press {A} to cycle the menu language. Translations load from <plugin folder>/lang/. The template ships English only."),
+#endif
     IT_CHEAT("Toggle notifications (toast)", CH_CFG_TOAST, "Shows a small notification in-game when something is toggled."),
 #if !TOOLS_ONLY
     IT_CHEAT("Auto-fill Tracker on open", CH_CFG_AUTOFILL, "When on, the Tracker syncs itself from game memory every time you open it."),
@@ -1042,12 +1058,13 @@ static const Item settingsItems[] = {
 static const Folder folders[NUM_FOLDERS] = {
 #if TOOLS_ONLY
     { "CTRComposer Tools",    rootItems,     FCOUNT(rootItems) },
+    { "Settings",             settingsItems, FCOUNT(settingsItems) },
 #else
     { "CTRComposer Template", rootItems,     FCOUNT(rootItems) },
-#endif
     { "Examples",             exampleItems,  FCOUNT(exampleItems) },
     { "Tools",                toolsItems,    FCOUNT(toolsItems) },
     { "Settings",             settingsItems, FCOUNT(settingsItems) },
+#endif
 };
 
 static u8  folderFav[NUM_FOLDERS]; // folders starred for the quick menu (own Favorites lines, '#'-prefixed)
@@ -1056,7 +1073,11 @@ static int g_openFolder = -1;      // quick menu sets this to a folder id to ope
 static int g_openTool   = -1;      // quick menu sets this to a tool id to launch after it closes
 // stable keys for tool favorites in Favorites.txt (index = tool id; order must match the T_* enum)
 static const char *kToolKeys[NUM_TOOLS] = {
+#if TOOLS_ONLY
+    "Cheat Search", "RAM Dumper", "Hex Editor", "About", "Plugin Guide"
+#else
     "Cheat Search", "RAM Dumper", "Hex Editor", "About", "Game Guide", "Plugin Guide", "Tracker"
+#endif
 };
 
 // Hook for hiding rows dynamically (the reference build used it for a category filter).
@@ -1240,6 +1261,7 @@ static void CFillInset(int x, int y, int w, int h, int dim)
 // the active theme's accent is itself dark (a muted brown or navy accent, say).
 // Lift a too-dark color toward white, preserving hue, so it reads on the ~{20,16,10} inset.
 // Bright colors pass through unchanged, so it's safe to apply blindly.
+#if !TOOLS_ONLY
 static void LiftForDark(u8 r, u8 g, u8 b, u8 *o)
 {
     int lum = (r * 30 + g * 59 + b * 11) / 100;
@@ -1249,6 +1271,7 @@ static void LiftForDark(u8 r, u8 g, u8 b, u8 *o)
     o[1] = (u8)(g + (255 - g) * t / 100);
     o[2] = (u8)(b + (255 - b) * t / 100);
 }
+#endif
 
 static void ApplyTheme(int idx)
 {
@@ -1793,7 +1816,11 @@ static void ComposeBottom(void)
     CFill(tx, ty + 17, CTextWidth(PLUGIN_NAME) + 8, 1, GOLD);
     CTextBtn(tx, ty + 30,  T("{DP} navigate / page"), INK, 0);
     CTextBtn(tx, ty + 48,  T("{A} open / toggle    {B} back"), INK, 0);
+#if TOOLS_ONLY
+    CTextBtn(tx, ty + 66,  T("{X} info    {Y} favorite"), INK, 0);
+#else
     CTextBtn(tx, ty + 66,  T("{X} cheat info    {Y} favorite"), INK, 0);
+#endif
     CText(tx, ty + 84,  T("SELECT: close menu"), INK, 0);
     // quick-menu hint on two lines, dropped a touch below SELECT so it isn't crowded, and short enough
     // that the combo line stays left and never runs off the parchment.
@@ -1885,6 +1912,7 @@ static void BookIcon(int x, int y)        // Guides: an open book
         CFill(x + 9, y + 5 + r * 3, 4, 1, BG);
     }
 }
+#if !TOOLS_ONLY
 static void ChecklistIcon(int x, int y)   // Tracker: a ticked list
 {
     for (int r = 0; r < 3; ++r)
@@ -1895,6 +1923,7 @@ static void ChecklistIcon(int x, int y)   // Tracker: a ticked list
     CFill(x + 2, y + 4, 1, 1, GREEN_ON);  // tick on the first row
     CFill(x + 3, y + 5, 1, 1, GREEN_ON);
 }
+#endif
 static void GearIcon(int x, int y)        // Settings rows
 {
     CDisc(x + 7, y + 7, 5, GOLD);
@@ -1909,7 +1938,9 @@ static void CategoryIcon(int folderId, int x, int y)
 {
     switch (folderId)
     {
+#if !TOOLS_ONLY
         case F_TOOLS:    GridIcon(x, y - 1); break;
+#endif
         case F_SETTINGS: GearIcon(x, y - 1); break;
         default:         FolderIconSmall(x, y + 1); break;
     }
@@ -1924,9 +1955,11 @@ static void ToolIcon(int tool, int x, int y)
         case T_RAMDUMP:     DiskIcon(x, y);      return;
         case T_HEXEDIT:     GridIcon(x, y);      return;
         case T_ABOUT:       InfoIcon(x, y);      return;
+#if !TOOLS_ONLY
         case T_GAMEGUIDE:   BookIcon(x, y);      return;
-        case T_PLUGINGUIDE: BookIcon(x, y);      return;
         case T_TRACKER:     ChecklistIcon(x, y); return;
+#endif
+        case T_PLUGINGUIDE: BookIcon(x, y);      return;
         default:            FolderIconSmall(x, y + 2); return;
     }
 }
@@ -3085,12 +3118,30 @@ static void ToolAbout(void)
         // Replace the "Your plugin" block with your own name and repo. Please KEEP the
         // "CTRComposer engine" block - that is the attribution for the engine you are
         // building on, the same way the engine credits Luma3DS and PabloMK7 below it.
+#if TOOLS_ONLY
+        { PLUGIN_NAME,                   1 },
+        { PLUGIN_VER,                    0 },
+        { "",                            0 },
+        { "A universal memory toolkit:",            0 },
+        { "Cheat Search, RAM Dumper and a",         0 },
+        { "Hex Editor, in every title.",            0 },
+        { "",                            0 },
+        { "Installed as default.3gx, so it",        0 },
+        { "loads wherever no other plugin does.",   0 },
+        { "",                            0 },
+        { "It carries no cheats on purpose -",      0 },
+        { "an address belongs to one game and",     0 },
+        { "one region. Build your own plugin",      0 },
+        { "from the CTRComposer template.",         0 },
+        { "",                            0 },
+#else
         { PLUGIN_NAME " Blank Template", 1 },
         { PLUGIN_VER,                    0 },
         { "",                            0 },
         { "Your plugin: Your Name",      1 },
         { "github.com/you/your-plugin",  0 },
         { "",                            0 },
+#endif
         { "CTRComposer engine",          1 },
         { "A raw .3gx overlay engine for",          0 },
         { "the Nintendo 3DS.",                      0 },
@@ -3103,9 +3154,11 @@ static void ToolAbout(void)
         { "3GX loader / tool: PabloMK7", 0 },
         { "Small font: Linux 6x10 console font",    0 },
         { "",                            0 },
+#if !TOOLS_ONLY
         { "Add your own credits here - and do",     0 },
         { "credit anyone whose address maps,",      0 },
         { "art or save data you build on.",         0 },
+#endif
     };
     int N = (int)(sizeof(lines) / sizeof(lines[0]));
     int x = WIN_X + 16;
@@ -3568,7 +3621,9 @@ static void GuideWrap(const char *s, int cols)
 }
 
 // static branded bottom panel while a guide is open
-static void GuideBottom(const char *subtitle)
+// Bottom-screen header for BOTH readers. The title used to be hardcoded to "Game Guide",
+// which meant the Plugin Guide announced itself as the Game Guide - take it as a parameter.
+static void GuideBottom(const char *title, const char *subtitle)
 {
     for (int yy = 0; yy < BOT_H; ++yy)
         for (int xx = 0; xx < BOT_W; ++xx)
@@ -3581,8 +3636,8 @@ static void GuideBottom(const char *subtitle)
         }
     CFillBlend(0, 0, BOT_W, BOT_H, BG, 230);
     CFill(6, 4, BOT_W - 12, 1, GOLD); CFill(6, BOT_H - 6, BOT_W - 12, 1, GOLD);
-    CText(14, 10, T("Game Guide"), GOLD, 1);
-    CFill(14, 32, C6Width(T("Game Guide")) * 2, 1, GOLD);
+    CText(14, 10, title, GOLD, 1);
+    CFill(14, 32, C6Width(title) * 2, 1, GOLD);
     CText6(14, 44, subtitle, INK);   // guide content: stays English
     CText6(14, 70, T("Read on the top screen."), INK_DIM);
     CText6Btn(14, 86, T("{DP} / {L}/{R} : scroll or move"), INK_DIM);
@@ -3702,6 +3757,7 @@ static int GuideList(const char *title, const char **labels, int count, int init
     }
 }
 
+#if !TOOLS_ONLY
 // Credits page for the Game Guide. If you ship someone else's walkthrough text,
 // THIS is where you credit them - name the author, where it came from, and under
 // what permission. Replace the placeholder below before you publish.
@@ -3725,7 +3781,7 @@ static const char *GUIDE_CREDITS =
 static int g_ggMode = 0, g_ggCatCur = 0, g_ggCat = 0, g_ggPage = 0, g_ggScroll = 0, g_ggCredScroll = 0;
 static void ToolGameGuide(void)
 {
-    GuideBottom(T("Game Guide"));
+    GuideBottom(T("Game Guide"), T("Your game's content"));
     while (1)
     {
         int ncats; const GuideCat *cats = GG_Cats(&ncats);
@@ -3769,7 +3825,71 @@ static void ToolGameGuide(void)
     }
 }
 
+#endif // !TOOLS_ONLY
+
 // ---- Plugin Guide (original content, explains this plugin) ----
+#if TOOLS_ONLY
+// Pages for the universal (default.3gx) build. Nothing here may mention cheats, the tracker or
+// the game guide - none of them exist in this binary, and a guide that describes menus you do
+// not have is worse than no guide.
+static const GuidePage PLUGIN_PAGES[] = {
+    { "What this is",
+      "CTRComposer Tools is a single plugin that loads into every title on the system, from\n"
+      "sd:/luma/plugins/default.3gx.\n"
+      "\n"
+      "Press SELECT during any game to open this menu. The game pauses while it is open.\n"
+      "Press SELECT again, from anywhere, to jump straight back.\n"
+      "\n"
+      "It carries no cheats, and that is not an oversight: a cheat is a memory address, and an\n"
+      "address belongs to one game and one region. What IS universal is the tooling - searching\n"
+      "memory, reading it, editing it - so that is what this build carries.\n"
+      "\n"
+      "Navigate with the D-Pad. A opens a tool, B goes back, X shows info about the selected\n"
+      "row, Y stars it as a favourite." },
+    { "Cheat Search",
+      "Find the memory address of any value, then change it. This works on any game, because\n"
+      "it scans memory rather than knowing anything about the title.\n"
+      "\n"
+      "Known Value: type a number you can see (health, coins, a timer), Search, then narrow the\n"
+      "results as the value changes (Greater / Less / Changed...).\n"
+      "\n"
+      "Unknown Search: don't know the number? Take a snapshot, change the value in game, then\n"
+      "scan Increased / Decreased / Changed to close in on it.\n"
+      "\n"
+      "The real loop: Search, press SELECT to return to the game, change the value, SELECT to\n"
+      "reopen (results are kept), scan again. Repeat until a few results remain. Press A on a\n"
+      "result to poke a new value. L undoes a scan." },
+    { "RAM Dumper",
+      "Save a block of memory to a .bin file on the SD card.\n"
+      "\n"
+      "Set a Start address (or press Y / From Search to pull the address you found in Cheat\n"
+      "Search) and a Size, then Dump. Files are written to the plugin's own folder, under\n"
+      "dumps/.\n"
+      "\n"
+      "The tool only writes memory that is actually readable, so it never crashes on an\n"
+      "unmapped address. Good for studying the bytes around a value you found." },
+    { "Hex Editor",
+      "Browse memory as a live hex grid and edit any byte on the spot.\n"
+      "\n"
+      "D-Pad moves the cursor (left/right one byte, up/down one row). L/R page up and down.\n"
+      "X jumps to an address; Y jumps to your Cheat Search result. Press A to edit the byte\n"
+      "under the cursor.\n"
+      "\n"
+      "Read-only regions are protected: editing there is refused instead of crashing.\n"
+      "Unreadable bytes show as --." },
+    { "Quick menu & tips",
+      "Star a tool with Y and it appears in the quick menu: hold L+SELECT (or R+SELECT) in\n"
+      "game to launch it without opening the full menu. The combo is configurable in Settings.\n"
+      "\n"
+      "- SELECT is always 'back to the game', from any screen.\n"
+      "- Reopening the menu returns you to where you were, even inside a tool.\n"
+      "- Search results survive closing the menu, and even closing this menu entirely.\n"
+      "- Settings, favourites and your theme are saved to the SD card.\n"
+      "\n"
+      "This build loads into everything, including the Home Menu and homebrew. If something\n"
+      "misbehaves, delete default.3gx and check whether it still happens." },
+};
+#else
 static const GuidePage PLUGIN_PAGES[] = {
     { "Overview",
       "This plugin draws its own overlay on top of the running game.\n"
@@ -3824,14 +3944,17 @@ static const GuidePage PLUGIN_PAGES[] = {
       "- Code-patch cheats are never auto-enabled on boot, by design.\n"
       "- Toast notifications can be turned off in Settings." },
 };
+#endif
 #define PLUGIN_NPAGES ((int)(sizeof(PLUGIN_PAGES) / sizeof(PLUGIN_PAGES[0])))
 
 // Return the active guide model: SD translation if loaded, else embedded English.
+#if !TOOLS_ONLY
 static const GuideCat *GG_Cats(int *n)
 {
     if (g_ggNCats) { *n = g_ggNCats; return g_ggCatsBuf; }
     *n = GUIDE_NCATS; return GUIDE_CATS;
 }
+#endif
 static const GuidePage *PG_Pages(int *n)
 {
     if (g_pgNPages) { *n = g_pgNPages; return g_pgPagesBuf; }
@@ -3841,7 +3964,7 @@ static const GuidePage *PG_Pages(int *n)
 static int g_pgMode = 0, g_pgCur = 0, g_pgPage = 0, g_pgScroll = 0; // resume state
 static void ToolPluginGuide(void)
 {
-    GuideBottom(T("How to use this plugin"));
+    GuideBottom(T("Plugin Guide"), T("How to use this plugin"));
     while (1)
     {
         int npg; const GuidePage *pages = PG_Pages(&npg);
@@ -3865,6 +3988,7 @@ static void ToolPluginGuide(void)
     }
 }
 
+#if !TOOLS_ONLY
 // ===================== Completion tracker (per-item progress) =====================
 // A general "collectibles / progress" tool, and one of the more useful things the engine
 // gives you for free. Each item has one of four states:
@@ -4638,15 +4762,19 @@ static void ToolChecklist(void)
     }
 }
 
+#endif // !TOOLS_ONLY
+
 static void ToolRun(int t)
 {
     if (t == T_SEARCH) ToolSearch();
     else if (t == T_RAMDUMP) ToolRamDump();
     else if (t == T_HEXEDIT) ToolHexEdit();
     else if (t == T_ABOUT) ToolAbout();
+#if !TOOLS_ONLY
     else if (t == T_GAMEGUIDE) ToolGameGuide();
-    else if (t == T_PLUGINGUIDE) ToolPluginGuide();
     else if (t == T_TRACKER)   ToolChecklist();
+#endif
+    else if (t == T_PLUGINGUIDE) ToolPluginGuide();
 }
 
 // ===================== Game pause (Luma thread scheduler) =====================

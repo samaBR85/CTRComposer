@@ -50,29 +50,56 @@ jobs:
       # NOT parallel: the devkitPro Makefile template recurses into build/ and its link rule
       # races the compile rules under -j, so `make -j` intermittently fails with
       # "cannot find main.o". It is five source files - serial costs nothing.
-      - name: Build
+      - name: Build the template
         run: make
 
-      - name: Verify artifact
+      # Second artifact from the same tree: the universal build, for Luma's default.3gx slot.
+      # Only the TOOLS_ONLY switch and the on-screen name differ - sed them, rebuild, restore.
+      - name: Build the tools-only variant (default.3gx)
         run: |
           set -eux
-          test -f CTRComposer-BlankTemplate.3gx
-          ls -l CTRComposer-BlankTemplate.3gx
-          # Luma3DS only accepts the 3GX$0002 container; fail loudly on 3GX$0001.
-          head -c 8 CTRComposer-BlankTemplate.3gx | grep -q '3GX\$0002'
+          cp Sources/main.c /tmp/main.c.orig
+          sed -i \
+            -e 's/^#define TOOLS_ONLY 0$/#define TOOLS_ONLY 1/' \
+            -e 's/^#define PLUGIN_NAME "CTRComposer"/#define PLUGIN_NAME "CTRComposer Tools"/' \
+            Sources/main.c
+          grep -q '^#define TOOLS_ONLY 1' Sources/main.c   # fail loudly if the sed missed
+          make clean
+          make
+          mv CTRComposer-BlankTemplate.3gx default.3gx
+          cp /tmp/main.c.orig Sources/main.c
+          make clean
+          make
 
-      - name: Upload build artifact
+      - name: Verify artifacts
+        run: |
+          set -eux
+          ls -l CTRComposer-BlankTemplate.3gx default.3gx
+          for f in CTRComposer-BlankTemplate.3gx default.3gx; do
+            # Luma3DS only accepts the 3GX$0002 container; fail loudly on 3GX$0001.
+            head -c 8 "$f" | grep -q '3GX\$0002'
+          done
+          # The universal build must not carry menus it does not have.
+          for s in Tracker 'Game Guide' 'Example:'; do
+            if grep -qa "$s" default.3gx; then echo "default.3gx still mentions: $s" >&2; exit 1; fi
+          done
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: CTRComposer-BlankTemplate
-          path: CTRComposer-BlankTemplate.3gx
+          name: CTRComposer
+          path: |
+            CTRComposer-BlankTemplate.3gx
+            default.3gx
           if-no-files-found: error
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: CTRComposer-BlankTemplate.3gx
+          files: |
+            CTRComposer-BlankTemplate.3gx
+            default.3gx
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

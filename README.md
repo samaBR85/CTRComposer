@@ -5,10 +5,17 @@ plugin for *any* 3DS game.**
 
 `devkitARM + libctru` · `Luma3DS PLGLDR` · `3gxtool 1.3` · any Title ID
 
-This repository is the **blank template**. It builds to
-**`CTRComposer-BlankTemplate.3gx`** — the complete engine (menu, themes, tools, on-screen
-keypad, button glyphs, persistence, localization) with **no game bolted on**. Clone it, add a
-cheat table, some art and your Title ID, and you have your own plugin.
+This repository builds **two things from the same tree**:
+
+| | What it is | Where it goes |
+|---|---|---|
+| **`CTRComposer-BlankTemplate.3gx`** | The blank template: the complete engine — menu, themes, tools, keypad, button glyphs, persistence, localization — with **no game bolted on**. Clone it, add a cheat table, art and your Title ID, and you have your own plugin. | `luma/plugins/<TitleID>/` |
+| **`default.3gx`** | A universal **memory toolkit**: Cheat Search, RAM Dumper and Hex Editor, in every title on the system. No cheats — an address belongs to one game and one region — but the tools don't care what game they're in. | `luma/plugins/` |
+
+The second is the same engine with `TOOLS_ONLY` set to 1 in `Sources/main.c`; the per-game
+furniture (example cheats, tracker, game guide) is compiled out, along with every menu string
+that referenced it. Luma falls back to `default.3gx` for any title with no folder of its own,
+so a per-game plugin always wins over it.
 
 It ships with **zero game art and zero game addresses**. The example cheats are inert
 placeholders that write nothing until you enable them (see `EXAMPLE_ENABLED` in
