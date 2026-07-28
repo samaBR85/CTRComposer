@@ -59,10 +59,8 @@ jobs:
         run: |
           set -eux
           cp Sources/main.c /tmp/main.c.orig
-          sed -i \
-            -e 's/^#define TOOLS_ONLY 0$/#define TOOLS_ONLY 1/' \
-            -e 's/^#define PLUGIN_NAME "CTRComposer"/#define PLUGIN_NAME "CTRComposer Tools"/' \
-            Sources/main.c
+          # ONE edit: PLUGIN_NAME and PLUGIN_TAG follow TOOLS_ONLY in the source.
+          sed -i 's/^#define TOOLS_ONLY 0$/#define TOOLS_ONLY 1/' Sources/main.c
           grep -q '^#define TOOLS_ONLY 1' Sources/main.c   # fail loudly if the sed missed
           make clean
           make
