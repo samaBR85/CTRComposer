@@ -57,7 +57,9 @@ string that referenced it, which is checked by CI.</sub>
 
 **[Project page](https://samabr85.github.io/CTRComposer/)**
 
-> **No prebuilt `.3gx` is published yet.** Build it yourself — see *Quick start* below.
+**[Download the latest release](https://github.com/samaBR85/CTRComposer/releases/latest)** —
+both `.3gx` files are attached to every tagged release. Or build them yourself: see *Quick
+start* below.
 
 <p align="center">
   <img src="screenshots/hero.png" alt="CTRComposer running on a 3DS: the HOME menu on the top screen and the control legend on the bottom" width="360">
@@ -631,10 +633,18 @@ guilt.
 
 ## Continuous integration
 
-`.github/workflows/build.yml` builds on every push and PR and uploads
-`CTRComposer-BlankTemplate.3gx` as a run artifact, which you can download from the Actions tab.
+`.github/workflows/build.yml` builds **both** `.3gx` files from the same tree on every push and
+PR, and uploads them as run artifacts you can download from the Actions tab. On a `v*` tag it
+also creates a GitHub Release with both attached.
+
 It runs in the official `devkitpro/devkitarm` container and builds `3gxtool` from source, since
-that tool is not part of the image. It also asserts the output really is a `3GX$0002` container.
+that tool is not part of the image. It asserts each output really is a `3GX$0002` container —
+the older `3GX$0001` builds fine and then silently refuses to load — and it fails the build if
+`default.3gx` ever mentions a menu it doesn't have.
+
+```sh
+git tag v1.0.0 && git push origin v1.0.0   # cut a release
+```
 
 ## Credits
 

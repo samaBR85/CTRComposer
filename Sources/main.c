@@ -39,17 +39,17 @@
 // this to 1 also writes a marker file at shutdown so you can tell in one run.
 #define EXIT_HANDSHAKE 0
 
-#define PLUGIN_VER "v0.1.3 build 8"   // full string - About screen and pause box (have room)
+#define PLUGIN_VER "v1.0.0"           // full string - About screen and pause box (have room)
 
 // Name and short tag follow the build flavour automatically, so flipping TOOLS_ONLY is the ONLY
 // edit needed to produce the other binary. Deriving these beat setting them by hand: the local
 // build and CI had already drifted apart doing it manually.
 #if TOOLS_ONLY
 #define PLUGIN_NAME "CTRComposer Tools"
-#define PLUGIN_TAG  "T8"              // compact tag - cramped menu title bar
+#define PLUGIN_TAG  "T1.0"              // compact tag - cramped menu title bar
 #else
 #define PLUGIN_NAME "CTRComposer"
-#define PLUGIN_TAG  "b8"
+#define PLUGIN_TAG  "1.0"
 #endif
 
 static Handle   thread;
