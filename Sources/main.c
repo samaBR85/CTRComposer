@@ -1862,6 +1862,12 @@ static void QueueToast(const char *label, int on) { QueueToastRaw(label, on ? ":
 
 static void ToastTick(void)
 {
+    // Unreachable today in practice: toastTicks only becomes >0 via QueueToastRaw(), and every
+    // call site of that is inside RunMenu()/QuickMenu(), which already require gCompose before
+    // getting this far. The check here is explicit anyway - CFill/CText6Btn below write through
+    // gCompose, and that implicit chain is exactly the kind of thing a new toast call site added
+    // later could break silently without this guard.
+    if (!gCompose) return;
     if (toastTicks <= 0) return;
     toastTicks--;
 
@@ -4980,7 +4986,12 @@ static void RunMenu(void)
     int depth = menuDepth;
     int folderIdx = menuFolder, cursor = menuCursor, scroll = menuScroll;
 
-    if (!gCompose) return;
+    // All three ThreadMain allocations are required before anything below is safe to call:
+    // BotGrab() writes into savedBot unconditionally once it has one, and CaptureTopBackdrop /
+    // RestoreTopBackdrop silently no-op without savedTop, which would leave stale pixels on
+    // screen instead of a clean menu. Bail out here - once, at the only entry point - rather
+    // than scattering a null-check into every function that touches one of the three.
+    if (!gCompose || !savedBot || !savedTop) return;
     SysFontInit();
     g_quitToGame = 0; // fresh; a sub-loop sets this to request "exit to game"
 
@@ -5254,7 +5265,9 @@ static void QuickMenu(void)
             }
         }
 
-    if (!gCompose) return;
+    // Same three-buffer gate as RunMenu() - see the comment there. QuickMenu calls BotGrab()
+    // too, so savedBot needs the same protection here.
+    if (!gCompose || !savedBot || !savedTop) return;
     SysFontInit();   // idempotent - ensures the system font is loaded even when the quick menu is
                      // the FIRST thing opened after boot (else info boxes fall back to the tiny font)
     PauseGame();
