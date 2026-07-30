@@ -100,6 +100,10 @@ $(OUTPUT).3gx : $(OFILES)
 	@echo creating $(notdir $@)
 	@3gxtool -s $(word 1, $^) $(TOPDIR)/$(PLGINFO) $@
 
+# Without this, make treats the .elf as a disposable intermediate of the .elf->.3gx chain and
+# deletes it right after linking. Keeping it around lets Tools/fingerprint.sh inspect symbols
+# (see PLANO-REFATORACAO.md, Etapa 0) instead of every refactor step needing a fresh objdump.
+.PRECIOUS: %.elf
 
 -include $(DEPENDS)
 
