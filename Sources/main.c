@@ -11,39 +11,23 @@
 #include "guide.h"
 #include "themes.h"
 
-// Public release version + build counter. Bump the build number EVERY build: the on-screen tag
-// is your confirmation that the .3gx actually on the SD card is the one you just compiled.
-// Change it with a real edit and check it on screen - a blind sed can silently no-op and leave
-// you debugging a stale binary.
-// TOOLS-ONLY BUILD, for use as Luma's universal plugin: /luma/plugins/default.3gx
-//
-// Luma falls back to that file for ANY title with no plugin folder of its own, so one build
-// follows you into every game. Cheats cannot work that way - an address is specific to one game
-// and one region - but the memory TOOLS are completely game-agnostic, and those are what is
-// worth having everywhere.
-//
-// Set to 1 and the menu drops the per-game furniture (the example cheats, the tracker, the game
-// guide) and surfaces Cheat Search / RAM Dumper / Hex Editor directly on HOME. Nothing else
-// about the engine changes.
-//
-// Note that as default.3gx the plugin loads into EVERYTHING - the Home Menu, applets, homebrew -
-// not just games, and it flips the host process to RWX and pauses its threads like it does
-// anywhere else. That is a much broader blast radius than a single title. Treat it as
-// experimental.
+// 1 = the universal build for Luma's /luma/plugins/default.3gx slot, which loads into any title
+// with no plugin folder of its own. Drops the per-game parts (example cheats, tracker, game
+// guide) and puts the memory tools straight on HOME; the engine itself is unchanged.
+// CAUTION: as default.3gx it loads into EVERYTHING - Home Menu, applets, homebrew - flipping
+// each host process to RWX and pausing its threads. Much broader blast radius. Experimental.
 #define TOOLS_ONLY 0
 
-// Opt-in: respond to Luma's process-exit event and tear the plugin down before the game dies.
-//
-// OFF because it was MEASURED not to work - see the block in ThreadMain. Left in the tree
-// because it costs nothing and a future Luma build may start delivering the event; flipping
-// this to 1 also writes a marker file at shutdown so you can tell in one run.
+// Opt-in teardown on Luma's process-exit event. OFF because it was measured never to fire (see
+// ThreadMain). Kept in case a future Luma delivers it: flipping this to 1 also writes a marker
+// file at shutdown, so one run tells you.
 #define EXIT_HANDSHAKE 0
 
-#define PLUGIN_VER "v1.0.1"           // full string - About screen and pause box (have room)
+// Bump EVERY build - the on-screen tag is your proof that the .3gx on the SD card is the one you
+// just compiled. Edit it for real and check it on screen; a blind sed can no-op silently.
+#define PLUGIN_VER "v1.0.1"           // About screen and pause box
 
-// Name and short tag follow the build flavour automatically, so flipping TOOLS_ONLY is the ONLY
-// edit needed to produce the other binary. Deriving these beat setting them by hand: the local
-// build and CI had already drifted apart doing it manually.
+// Name and tag follow TOOLS_ONLY, so flipping that flag is the only edit the other build needs.
 #if TOOLS_ONLY
 #define PLUGIN_NAME "CTRComposer Tools"
 #define PLUGIN_TAG  "T1.0"              // compact tag - cramped menu title bar
@@ -304,13 +288,9 @@ static void GrabFb(void)
 }
 
 // ===================== Cheat IDs =====================
-// THIS IS THE GAME-SPECIFIC PART. Everything else in this file is reusable engine.
-//
-// Add one enum entry per cheat, then:
-//   - give it a row in a Folder below (IT_CHEAT),
-//   - implement it in ApplyCheats() (continuous) or OneShot() (applied once).
-// The CH_CFG_* entries at the end are not cheats - they are Settings rows that
-// reuse the same row-drawing code, which is why they live in the same enum.
+// Game-specific. One enum entry per cheat, then a row in a Folder below (IT_CHEAT) and an
+// implementation in ApplyCheats() (continuous) or OneShot() (applied once).
+// CH_CFG_* are not cheats - they are Settings rows reusing the same row-drawing code.
 enum {
     // ---- EXAMPLE cheats: replace these with your game's ----
     CH_EX_DIRECT,     // continuous: direct u16 write to a fixed address
@@ -339,23 +319,11 @@ static int favDirty = 0;    // a favorite toggled -> save Favorites.txt on menu 
 static int g_themeIdx = 0, g_themeParchment = 0; // active theme (colors live in CGOLD/... below)
 
 // ===================== Where this plugin keeps its files =====================
-// Luma loads a plugin from  sdmc:/luma/plugins/<TitleID>/<Name>.3gx  and this is where the
-// plugin keeps Settings.cfg, Favorites.txt, Tracker.txt, lang/, guide/ and dumps/.
-//
-// >>> SET THIS to your game's folder once you know its Title ID. <<<
-//
+// Holds Settings.cfg, Favorites.txt, Tracker.txt, lang/, guide/ and dumps/.
+// Set it to your game's folder once you know the Title ID:
 //     #define PLUGIN_DIR "/luma/plugins/0004000000033500/"
-//
-// Left empty, everything lands in /luma/plugins/ itself. That WORKS, and it is fine for a
-// first run before you know the Title ID - but the folder is shared by every game, so two
-// plugins built from this template would fight over the same Settings.cfg. Do not ship it
-// that way.
-//
-// (An earlier version tried to discover this at runtime from PluginHeader.pluginPathPA.
-// That field is a PHYSICAL address, and the PA_PTR mirror it needs is only valid for the IO
-// region a plugin gets mapped - like the HID register - not for arbitrary FCRAM. On hardware
-// the read never produced a usable path and it silently fell back here, which is how config
-// ended up in /luma/plugins/. A compile-time constant is predictable; that beats clever.)
+// Left empty everything lands in /luma/plugins/ itself, which works but is shared by every
+// game - two plugins built from this template would fight over the same Settings.cfg.
 #define PLUGIN_DIR ""
 
 #define DEFAULT_PLUGIN_DIR "/luma/plugins/"
@@ -417,14 +385,10 @@ static int  MemReadable(u32 a);               // fwd (defined with the Hex Edito
 static int  MemWritable(u32 a);               // fwd
 
 // ===================== Localization (gettext-style: English source = key) =====================
-// UI strings are wrapped in T("English"). At runtime T() looks the English text up in
-// a table loaded from <plugin dir>/lang/<Language>.txt and returns the translation, or
-// the English string unchanged when there's no entry - so a partial translation just
-// shows English for the missing lines instead of blanks.
-//
-// The template ships ENGLISH ONLY: no language files are included. The names below are
-// simply the filenames the loader will look for, so a translator can drop in
-// lang/Francais.txt and it works with no code change. Add or remove names freely.
+// UI strings are wrapped in T("English"). T() looks the English text up in a table loaded from
+// <plugin dir>/lang/<Language>.txt and returns the translation, or the English string unchanged
+// when there is no entry - so a partial translation degrades to English instead of blanks.
+// Ships English-only; the names below are just the filenames the loader looks for.
 static const char *kLangNames[] = {
     "English", "Francais", "Deutsch", "Italiano", "Espanol", "Portugues",
 };
@@ -534,15 +498,10 @@ static void LangProbeAvail(void)
 }
 
 // ===================== SD-loaded guides (per language) =====================
-// The English Game Guide + Plugin Guide stay embedded (guide.h / PLUGIN_PAGES) as the
-// always-available fallback. For other languages we load translated copies from
-// <plugin dir>/guide/<Name>/{game,plugin}.txt at runtime, so the binary stays small and
-// guides are editable without recompiling.
-//
-// This is also how you ship a GAME guide without touching C: drop
-// guide/English/game.txt on the SD card and it replaces the placeholder pages.
-// File format: "%C Category" starts a category, "%P Page" starts a page; every other
-// line is body text (kept verbatim, including its newlines).
+// The embedded English pages (guide.h / PLUGIN_PAGES) are the always-available fallback;
+// <plugin dir>/guide/<Name>/{game,plugin}.txt overrides them at runtime. That is also how to
+// ship a game guide without touching C.
+// Format: "%C Category" starts a category, "%P Page" starts a page, every other line is body.
 #define SDG_MAXCATS  12
 #define SDG_MAXPAGES 96
 
@@ -781,20 +740,15 @@ static void ConfigFill(ConfigBlob *c)
 }
 
 // ===================== Cheat implementations =====================
+// The plugin runs inside the game's process, so writing game memory is just a pointer write
+// (W8/W16/W32 above) - all you need are the addresses, from an existing code bank or from the
+// engine's own Cheat Search.
 //
-//   >>> THIS IS THE ONLY SECTION THAT IS GENUINELY GAME-SPECIFIC. <<<
+// Addresses are ALWAYS region- and version-specific. Re-anchor when either changes, or the
+// writes land somewhere random and crash the game.
 //
-// The plugin runs INSIDE the game's process, so writing game memory is just a pointer
-// write - W8/W16/W32 above. All you need are the addresses. Get them from an existing
-// source (a .plg, an Action Replay code bank, a community plugin - each write becomes
-// one line of C) or discover them with the engine's own Cheat Search tool.
-//
-// Addresses are ALWAYS region- and version-specific. Re-anchor them when you change
-// region, or the writes land somewhere random and crash the game.
-//
-// The four EXAMPLE_* addresses below are deliberately fake. They are guarded so the
-// template is safe to run as-is: EXAMPLE_ENABLED is 0, so nothing is ever written.
-// Set it to 1 once you have replaced the addresses with real ones.
+// The EXAMPLE_* addresses below are fake and guarded: EXAMPLE_ENABLED is 0, so nothing is
+// written until you set it to 1 with real addresses in place.
 #define EXAMPLE_ENABLED 0
 
 // EXAMPLE - replace with your game's address. A counter you want pinned to a value.
@@ -1252,13 +1206,8 @@ static int ThemeBgLight(void) { return (CBG[0] * 30 + CBG[1] * 59 + CBG[2] * 11)
 static u8 ClampU8(int v) { return (u8)(v < 0 ? 0 : v > 255 ? 255 : v); }
 
 // A recessed "inset" surface: form fields, value wells, progress troughs, status pills.
-//
-// Every one of these used to be a hardcoded olive literal (52,40,22 and friends) inherited from
-// the original plugin's parchment palette. They ignored the theme completely, so switching to a
-// dark theme left brown boxes scattered across the UI. Deriving them from CBG here means ONE
-// place controls the look and every theme - including ones you add later - just works.
-//
-// dim != 0 flattens the surface back toward the background, for disabled/locked fields.
+// Derived from CBG rather than hardcoded, so every theme - including ones added later - gets
+// these for free. dim != 0 flattens it back toward the background, for disabled/locked fields.
 static void CFillInset(int x, int y, int w, int h, int dim)
 {
     int lift = ThemeBgLight() ? -26 : 28;   // light theme: sink it. dark theme: raise it.
@@ -1534,18 +1483,12 @@ static void StarIcon(int x, int y)
 }
 
 // ===================== Sprites (RGBA4444 art) =====================
-// The template ships NO game art, so there is no sprite sheet here - but the machinery
-// stays, because the machinery is the reusable half:
+// No sprite sheet ships with the template - only the machinery: DrawImg() (1:1 blit),
+// DrawScaled() (any source size onto any rect), and the code-drawn vector icons below.
 //
-//   DrawImg()    - 1:1 alpha-blended blit of an RGBA4444 array (the button glyphs use it)
-//   DrawScaled() - nearest-neighbour scaled blit: any source size onto any destination rect
-//   the vector icons below - icons drawn from primitives: zero asset bytes, crisp at any
-//                  size, and recolourable, so they never clash with a theme
-//
-// To add real art, convert a PNG to an RGBA4444 C array (v = R4<<12 | G4<<8 | B4<<4 | A4)
-// and pack with ROUND-TO-NEAREST: clamp((c + 8) / 17, 0, 15). Truncating with c>>4 instead
-// biases every channel upward by up to +15/255 and visibly brightens the art - very obvious
-// on light tiles. Assets/gen_glyphs.py is a worked example of the correct packing.
+// Adding real art: convert to an RGBA4444 array (v = R4<<12 | G4<<8 | B4<<4 | A4) and pack with
+// ROUND-TO-NEAREST, clamp((c + 8) / 17, 0, 15). Truncating with c>>4 biases every channel up by
+// as much as +15/255 and visibly brightens the art. Assets/gen_glyphs.py packs it correctly.
 
 // Nearest-neighbour scaled blit of an arbitrary RGBA4444 sprite (sw x sh) into a dst rect
 // (dw x dh) on the top-screen compose buffer, alpha-blended. dim (0..255) darkens toward
@@ -1704,9 +1647,7 @@ static void PortalIcon(int x, int y)
     CDisc(x + 8, y + 8, 1, 210, 244, 255);            // bright core
 }
 
-// ---- size-modifier figures (Giant / Mini / Normal / Paper Link) ----
-// A tiny green-tunic Link silhouette: pointed cap, skin head, triangular tunic, two boots.
-// Centered on x+8, spanning rows [top,bot]; hw = tunic half-width at the hem.
+// Row icon for a cheat: maps the cheat id to one of the vector icons above.
 static void DrawCheatIcon(int x, int y, int ch)
 {
     switch (SpriteKeyForCheat(ch))
@@ -4005,32 +3946,25 @@ static void ToolPluginGuide(void)
 
 #if !TOOLS_ONLY
 // ===================== Completion tracker (per-item progress) =====================
-// A general "collectibles / progress" tool, and one of the more useful things the engine
-// gives you for free. Each item has one of four states:
+// Each item is in one of four states:
 //     0 untouched   1 auto-detected   2 you checked it   3 you cleared it
 //
-// AUTO-FILL = SYNC TO MEMORY, not a running tally. When it runs it re-reads every
-// detectable item and both SETS marks it finds and CLEARS stale auto-marks it no longer
-// finds, while never touching a mark you made by hand. That is what keeps the tool honest
-// after a save reload: it always reflects the CURRENT game state.
+// AUTO-FILL IS A SYNC, NOT A TALLY: it re-reads every detectable item and both sets marks it
+// finds and clears stale auto-marks it no longer finds, never touching a manual mark. That is
+// what keeps it correct after a save reload.
 //
-// Detection kinds - all read-only, and all keyed off addresses you supply:
+// Detection kinds, all read-only, keyed off addresses you supply:
 //   CK_MANUAL  - no memory signal; only you can tick it
 //   CK_BIT     - (R8(addr) & mask) != 0        a flag bit inside a byte
 //   CK_BYTEEQ  - R8(addr) == mask              an exact byte value
 //   CK_NONZERO - R8(addr) != 0                 "the slot is filled"
-// Add your own kind by extending this enum and ChecklistAutoFill() together.
+// A new kind means extending this enum and ChecklistAutoFill() together.
 //
-// >>> THE TABLE BELOW IS EMPTY OF GAME DATA. <<<
-// It ships with one "Example" category whose rows are placeholders pointing at address 0,
-// purely so the tool is explorable before you have any addresses. Replace CHK_CATS with
-// your game's collectibles - it is pure data, and the UI below neither knows nor cares how
-// many categories or items there are. If your game has nothing to track, delete the Tracker
-// row from rootItems[] and this whole section.
+// CHK_CATS below is a placeholder pointing at address 0 - replace it with your game's
+// collectibles, or delete the Tracker row from rootItems[] if there is nothing to track.
 //
-// Progress is persisted KEYED BY THE `key` STRING, not by position, so you can add, remove
-// and reorder items freely without invalidating anyone's saved progress. Never reuse a key
-// for a different item.
+// Progress persists KEYED BY THE `key` STRING, not by position, so items can be added, removed
+// and reordered without invalidating saved progress. Never reuse a key for a different item.
 enum { CK_MANUAL = 0, CK_BIT = 1, CK_BYTEEQ = 2, CK_NONZERO = 3 };
 enum { CKI_HEART, CKI_SKULL, CKI_NOTE, CKI_KEYITEM, CKI_NONE };
 
@@ -4157,16 +4091,12 @@ static void CText6Marquee(int x, int y, int w, const char *s, int tick, int dela
     CText6ClipRegion(x - off, y, s, x, x + w, r, g, b);
     CText6ClipRegion(x - off + cyclepx, y, s, x, x + w, r, g, b);
 }
-// Wraps a short label into up to 2 lines within width w, breaking on spaces. A lone "&" is
-// glued to the word that follows it BEFORE wrapping, so a line never ends on a dangling "&" -
-// used for hub category names ("Zora's Domain & Jabu-Jabu" etc).
+// Wraps a short label into up to 2 lines within width w. A lone "&" is glued to the word after
+// it before wrapping, so a line never ends on a dangling "&".
 //
-// Split choice is BALANCED, not greedy: if the whole label fits on one line, it stays on one
-// line. Otherwise, among every point where it could break into 2 lines, pick the one that
-// minimizes the longer of the two resulting line widths. A naive "pack line1 as full as
-// possible" wrap strands short connector words ("an", "&") alone on line1 just because there
-// happened to be room, e.g. "Becoming an" / "Adult" instead of the more even "Becoming" /
-// "an Adult"; balancing avoids that.
+// The split is BALANCED, not greedy: among every possible break point, pick the one minimizing
+// the longer of the two lines. Greedy packing strands connector words alone on line 1 whenever
+// there happens to be room ("Becoming an" / "Adult" instead of "Becoming" / "an Adult").
 typedef int (*ChkMeasureFn)(const char *);
 static void ChkWrapBalanced(const char *s, int w, char *line1, char *line2, ChkMeasureFn measure)
 {
@@ -5495,20 +5425,14 @@ void ThreadMain(void *arg)
         svcSleepThread((toastTicks > 0 ? 4 : 20) * 1000 * 1000);
 
 #if EXIT_HANDSHAKE
-        // Luma signals onProcessExitEvent when the game is shutting down. The 3gx contract
-        // appears to be: clean up, then signal resumeExitEvent so the loader can finish tearing
-        // the plugin down.
+        // The 3gx contract appears to be: clean up on onProcessExitEvent, then signal
+        // resumeExitEvent so the loader can finish tearing the plugin down.
         //
-        // DISABLED BY DEFAULT because it was TESTED AND DOES NOT RUN. Built with this on, and
-        // with PluginShutdown() writing a marker file to the SD card as proof, the marker never
-        // appeared after closing the game - while Settings.cfg written by the same code path
-        // did. So the file I/O was fine and this block simply never executed:
-        // PROCESSOP_GET_ON_EXIT_EVENT in main() does not hand back a usable event, and
-        // onProcessExitEvent stays 0.
-        //
-        // The reference plugin this engine came from ignores these events too, and shows no
-        // teardown problems, so nothing is lost. Kept behind the flag in case a future Luma
-        // build starts delivering the event - the marker file makes that a one-run check.
+        // MEASURED NOT TO RUN: built with this on and PluginShutdown() writing a marker file as
+        // proof, the marker never appeared after closing the game - while Settings.cfg written
+        // by the same code path did. PROCESSOP_GET_ON_EXIT_EVENT never hands back a usable
+        // event, so onProcessExitEvent stays 0 and this block is dead. The reference plugin
+        // ignores these events too and shows no teardown problems.
         if (onProcessExitEvent && svcWaitSynchronization(onProcessExitEvent, 0) == 0)
         {
             PluginShutdown();
