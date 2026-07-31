@@ -312,6 +312,31 @@ a verificação é byte a byte, o risco não é o argumento — o argumento é s
 
 ---
 
+## Etapa 8 — Documento de migração para os plugins derivados 🟡
+
+**Modelo sugerido: Opus.** **Risco: nenhum aqui** (é documentação; o risco fica na execução
+dentro de cada plugin).
+
+Depois que as Etapas 3–5 estabilizarem a estrutura, escrever um guia para as sessões que
+mantêm os plugins derivados adotarem o mesmo layout:
+
+- `ZeldaOOTplugin` — 6.172 linhas, ~60 cheats, tracker completo (957 linhas de dados)
+- `SegundoPluginDerivado` — 6.260 linhas, 49 cheats, teleporte, tema próprio
+
+**O ponto crítico do documento:** os dois **não** têm o mesmo motor que o template. Eles
+divergiram — o segundo plugin tem uma seção `Item sprites (from sprites.h)` que não existe aqui, e ambos
+alteraram funções de motor para features que o template não possui (teleporte, pickers com
+arte real). O guia tem que ser *"reorganize na mesma estrutura"*, **nunca** *"substitua seu
+motor pelo nosso"* — isso apagaria trabalho legítimo deles.
+
+O que torna a migração viável:
+- Os três projetos herdaram os **mesmos nomes de seção** (`// ===== Cheat implementations =====`
+  etc.), então as fronteiras de corte são reconhecíveis em todos.
+- A verificação byte a byte funciona igual para eles: cada plugin consegue provar que a própria
+  reorganização não alterou o binário.
+
+---
+
 ## Resumo dos modelos
 
 | Etapa | Modelo | Por quê |

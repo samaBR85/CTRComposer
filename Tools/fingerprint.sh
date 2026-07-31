@@ -46,4 +46,10 @@ if [ -z "$NM" ]; then
     exit 1
 fi
 
-"$NM" --print-size --defined-only "$ELF" | awk '{print $NF, $2}' | sort
+# O sed normaliza os sufixos numericos que o GCC gera (CSWTCH.925, foo.isra.0, bar.constprop.1):
+# esses numeros sao arbitrarios e mudam so de reordenar o arquivo, sem nenhum codigo mudar. O
+# TAMANHO continua sendo comparado, entao a checagem nao perde forca - so deixa de acusar ruido.
+"$NM" --print-size --defined-only "$ELF" \
+    | awk '{print $NF, $2}' \
+    | sed -E 's/\.(CSWTCH|isra|constprop|part|cold|lto_priv)\.[0-9]+/.\1/g; s/^CSWTCH\.[0-9]+/CSWTCH/' \
+    | sort

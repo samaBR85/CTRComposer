@@ -11,30 +11,7 @@
 #include "guide.h"
 #include "themes.h"
 
-// 1 = the universal build for Luma's /luma/plugins/default.3gx slot, which loads into any title
-// with no plugin folder of its own. Drops the per-game parts (example cheats, tracker, game
-// guide) and puts the memory tools straight on HOME; the engine itself is unchanged.
-// CAUTION: as default.3gx it loads into EVERYTHING - Home Menu, applets, homebrew - flipping
-// each host process to RWX and pausing its threads. Much broader blast radius. Experimental.
-#define TOOLS_ONLY 0
-
-// Opt-in teardown on Luma's process-exit event. OFF because it was measured never to fire (see
-// ThreadMain). Kept in case a future Luma delivers it: flipping this to 1 also writes a marker
-// file at shutdown, so one run tells you.
-#define EXIT_HANDSHAKE 0
-
-// Bump EVERY build - the on-screen tag is your proof that the .3gx on the SD card is the one you
-// just compiled. Edit it for real and check it on screen; a blind sed can no-op silently.
-#define PLUGIN_VER "v1.0.1"           // About screen and pause box
-
-// Name and tag follow TOOLS_ONLY, so flipping that flag is the only edit the other build needs.
-#if TOOLS_ONLY
-#define PLUGIN_NAME "CTRComposer Tools"
-#define PLUGIN_TAG  "T1.0"              // compact tag - cramped menu title bar
-#else
-#define PLUGIN_NAME "CTRComposer"
-#define PLUGIN_TAG  "1.0"
-#endif
+#include "plugin/identity.inc.c"
 
 static Handle   thread;
 static Handle   onProcessExitEvent, resumeExitEvent;
@@ -287,26 +264,7 @@ static void GrabFb(void)
         }
 }
 
-// ===================== Cheat IDs =====================
-// Game-specific. One enum entry per cheat, then a row in a Folder below (IT_CHEAT) and an
-// implementation in ApplyCheats() (continuous) or OneShot() (applied once).
-// CH_CFG_* are not cheats - they are Settings rows reusing the same row-drawing code.
-enum {
-    // ---- EXAMPLE cheats: replace these with your game's ----
-    CH_EX_DIRECT,     // continuous: direct u16 write to a fixed address
-    CH_EX_BYTE,       // continuous: u8 write
-    CH_EX_WORD,       // continuous: u32 write
-    CH_EX_BASEOFF,    // continuous: base pointer + offset write
-    CH_EX_HOTKEY,     // continuous: only while a rebindable hotkey is held
-    CH_EX_ONESHOT,    // one-shot: applied once, when you select it
-    CH_EX_ONESHOT2,   // one-shot with a custom result message
-    // ---- Settings rows (not cheats) ----
-    CH_CFG_TOAST, CH_CFG_AUTOFILL, CH_CFG_QMKEY, CH_CFG_HK1, CH_CFG_HK2,
-    CH_CFG_HKRESET, CH_CFG_THEME, CH_CFG_LANG,
-    NUM_CHEATS
-};
-static u8 cheatState[NUM_CHEATS];
-static u8 favorite[NUM_CHEATS];
+#include "plugin/cheat_ids.inc.c"
 
 // Brief green-check flash so instant (one-shot) cheats give in-menu feedback
 static int flashCheat = -1;
@@ -318,13 +276,6 @@ static int configDirty = 0; // settings changed -> save config on menu close
 static int favDirty = 0;    // a favorite toggled -> save Favorites.txt on menu close
 static int g_themeIdx = 0, g_themeParchment = 0; // active theme (colors live in CGOLD/... below)
 
-// ===================== Where this plugin keeps its files =====================
-// Holds Settings.cfg, Favorites.txt, Tracker.txt, lang/, guide/ and dumps/.
-// Set it to your game's folder once you know the Title ID:
-//     #define PLUGIN_DIR "/luma/plugins/0004000000033500/"
-// Left empty everything lands in /luma/plugins/ itself, which works but is shared by every
-// game - two plugins built from this template would fight over the same Settings.cfg.
-#define PLUGIN_DIR ""
 
 #define DEFAULT_PLUGIN_DIR "/luma/plugins/"
 
@@ -739,78 +690,6 @@ static void ConfigFill(ConfigBlob *c)
     c->autoFill = cheatState[CH_CFG_AUTOFILL];
 }
 
-// ===================== Cheat implementations =====================
-// The plugin runs inside the game's process, so writing game memory is just a pointer write
-// (W8/W16/W32 above) - all you need are the addresses, from an existing code bank or from the
-// engine's own Cheat Search.
-//
-// Addresses are ALWAYS region- and version-specific. Re-anchor when either changes, or the
-// writes land somewhere random and crash the game.
-//
-// The EXAMPLE_* addresses below are fake and guarded: EXAMPLE_ENABLED is 0, so nothing is
-// written until you set it to 1 with real addresses in place.
-#define EXAMPLE_ENABLED 0
-
-// EXAMPLE - replace with your game's address. A counter you want pinned to a value.
-#define EXAMPLE_ADDR_DIRECT   0x00000000u
-#define EXAMPLE_VALUE_DIRECT  0x03E7       // 999
-
-// EXAMPLE - replace with your game's address. The classic base+offset pattern: a
-// pointer to the player/entity struct, and a field at a fixed offset inside it.
-#define EXAMPLE_ADDR_BASE     0x00000000u  // holds a pointer
-#define EXAMPLE_OFF_FIELD     0x00u
-#define EXAMPLE_VALUE_FIELD   0x00000000u
-
-// EXAMPLE - replace with your game's address. Written once, when selected in the menu.
-#define EXAMPLE_ADDR_ONESHOT  0x00000000u
-#define EXAMPLE_VALUE_ONESHOT 0xFF
-
-// Read the base pointer for base+offset cheats. Returns 0 when it looks unusable, so
-// every caller can just check for 0 and skip - never write through a null base.
-static u32 ExampleBase(void)
-{
-    if (!EXAMPLE_ENABLED) return 0;
-    return R32(EXAMPLE_ADDR_BASE);
-}
-
-// One-shot cheats: applied instantly when selected in the menu, then the row flashes.
-// Return 1 if `id` is a one-shot (so the menu knows not to treat it as a toggle).
-// Set g_oneShotMsg to override the "OK" flash text - handy for ADDED/REMOVED toggles.
-static int OneShot(int id)
-{
-    g_oneShotMsg = "OK"; // default flash text
-    switch (id)
-    {
-        case CH_EX_ONESHOT:
-            if (EXAMPLE_ENABLED) W8(EXAMPLE_ADDR_ONESHOT, EXAMPLE_VALUE_ONESHOT);
-            else g_oneShotMsg = "EXAMPLE";  // nothing written: see EXAMPLE_ENABLED above
-            return 1;
-
-        // Same thing, but reporting a RESULT. A toggle-style one-shot (flip a bit, then read
-        // it back) can say which way it went, so the flash is unambiguous instead of a bare OK.
-        case CH_EX_ONESHOT2:
-            if (EXAMPLE_ENABLED)
-            {
-                u8 v = (u8)(R8(EXAMPLE_ADDR_ONESHOT) ^ 0x01);
-                W8(EXAMPLE_ADDR_ONESHOT, v);
-                g_oneShotMsg = (v & 0x01) ? "ADDED" : "REMOVED";
-            }
-            else g_oneShotMsg = "EXAMPLE";
-            return 1;
-
-        // Add your one-shots here:
-        //   case CH_MY_CHEAT: W16(0x00123456, 0x0064); return 1;
-        //
-        // For a CODE patch (an instruction rewrite in the read-only .text segment):
-        //   svcControlProcess(CUR_PROCESS_HANDLE, PROCESSOP_SET_MMU_TO_RWX, 0, 0); // once
-        //   ALWAYS save the original instruction first so the cheat can be switched off,
-        //   then W32() the new one and flush:
-        //   svcFlushEntireDataCache(); svcInvalidateEntireInstructionCache();
-        // NEVER auto-enable a code patch on boot.
-    }
-    return 0;
-}
-
 // ---- D-pad auto-repeat (typematic) -------------------------------------------------------------
 // Menu loops normally use edge detection (pad & ~prev), so a held button fires once. This wraps
 // that: hold a D-pad direction and, after a short delay, it keeps firing so long lists scroll
@@ -834,73 +713,10 @@ static u32 ARepeat(u32 pad, u32 *prev, int *hold)
     return down;
 }
 
-// Continuous cheats: applied every tick while the menu is CLOSED (game running).
-// Keep this cheap - it runs at game framerate.
-static void ApplyCheats(void)
-{
-    // Guard, not #if: the example bodies below stay COMPILED (so they cannot silently rot
-    // as the engine changes) while -Os folds them away entirely until you flip the flag.
-    if (!EXAMPLE_ENABLED) return;
 
-    u32 pad = HID_PAD;
+#include "plugin/cheats.inc.c"
 
-    // EXAMPLE - direct write. Pins a value for as long as the cheat is on.
-    // W8 / W16 / W32 pick the width; match whatever the game actually stores there.
-    if (cheatState[CH_EX_DIRECT])
-        W16(EXAMPLE_ADDR_DIRECT, EXAMPLE_VALUE_DIRECT);
-    if (cheatState[CH_EX_BYTE])
-        W8(EXAMPLE_ADDR_DIRECT, 0x63);           // 99, the classic "max this counter"
-    if (cheatState[CH_EX_WORD])
-        W32(EXAMPLE_ADDR_DIRECT, 0x0000270F);    // 9999
-
-    // EXAMPLE - base+offset write. ALWAYS null-check the base before writing through it.
-    if (cheatState[CH_EX_BASEOFF])
-    {
-        u32 base = ExampleBase();
-        if (base) W32(base + EXAMPLE_OFF_FIELD, EXAMPLE_VALUE_FIELD);
-    }
-
-    // EXAMPLE - hold-to-act, using the player's rebindable hotkey instead of a fixed button.
-    if (cheatState[CH_EX_HOTKEY] && (pad & hotKeys[hk1].mask))
-    {
-        u32 base = ExampleBase();
-        if (base) W32(base + EXAMPLE_OFF_FIELD, EXAMPLE_VALUE_FIELD);
-    }
-}
-
-// ===================== Pickers (choose a value from a list) =====================
-// A picker is a menu row that opens a list and writes the chosen value to one address.
-// Good for "which item is in this slot" style cheats where a toggle makes no sense.
-typedef struct { const char *name; u8 val; } PickOpt;
-typedef struct { const char *title; const PickOpt *opts; int count; u32 addr; } Picker;
-
-// EXAMPLE - replace the options and the address with your game's.
-static const PickOpt exampleOpts[] = {
-    { "None",     0x00 }, { "Option A", 0x01 }, { "Option B", 0x02 },
-    { "Option C", 0x03 }, { "Option D", 0x04 },
-};
-
-enum { PK_EXAMPLE, NUM_PICKERS };
-static const Picker pickers[NUM_PICKERS] = {
-    { "Example Slot", exampleOpts, (int)(sizeof(exampleOpts)/sizeof(exampleOpts[0])), EXAMPLE_ADDR_DIRECT },
-};
-
-// A picker points at a GAME address, and that address is a placeholder (0) until you fill it
-// in - and even then it can be wrong, or unmapped in the current scene. NEVER dereference it
-// blind: an unmapped read on the 3DS is a data abort that hard-freezes the console, with the
-// menu still on screen. These two wrap every picker access.
-static int PickerRead(const Picker *pk, u8 *out)
-{
-    if (!pk->addr || !MemReadable(pk->addr)) return 0;
-    *out = R8(pk->addr);
-    return 1;
-}
-static int PickerWrite(const Picker *pk, u8 v)
-{
-    if (!pk->addr || !MemWritable(pk->addr)) return 0;
-    W8(pk->addr, v);
-    return 1;
-}
+#include "plugin/pickers.inc.c"
 
 // ===================== Menu model (folders) =====================
 // A layout-agnostic data model: DrawMenuItem() renders ONE row/cell wherever you put it,
@@ -932,103 +748,7 @@ static void ToolRun(int t); // fwd
 #define IT_SEP(lbl)            { lbl, -2, -1, -1, NULL, -1, 0 } // non-selectable section header
 #define IS_SEP(it)             ((it)->cheat == -2)
 
-#if TOOLS_ONLY
-// Universal build: the tools ARE the plugin, so they go straight on HOME with no folder to
-// dig through. No cheats, no tracker, no game guide - none of those can mean anything when the
-// same binary loads into every title on the system.
-static const Item rootItems[] = {
-    IT_SEP("MEMORY TOOLS"),
-    IT_TOOL_WIDE("Cheat Search", T_SEARCH,  "Search this game's RAM for a value, then narrow it down (greater/less/changed...) to find its address. Poke results directly. Works on any title - it scans memory, it doesn't need to know the game."),
-    IT_TOOL("RAM Dumper",   T_RAMDUMP, "Save a block of memory to a .bin on the SD card. Pick a start address and size, or pull the address from Cheat Search."),
-    IT_TOOL("Hex Editor",   T_HEXEDIT, "Browse memory as a live hex grid and edit any byte on the spot. Read-only regions are protected."),
-    IT_SEP("SYSTEM"),
-    IT_TOOL("Plugin Guide", T_PLUGINGUIDE, "How to use this plugin: the menu, the quick menu, and the memory tools."),
-    IT_TOOL("About",        T_ABOUT,   "Plugin info and credits."),
-    IT_FOLDER("Settings",   F_SETTINGS),
-};
-#else
-static const Item rootItems[] = {
-    IT_SEP("CHEATS"),
-    IT_FOLDER("Examples", F_EXAMPLES),
-    IT_SEP("GUIDES"),
-    IT_TOOL_WIDE("Tracker", T_TRACKER, "A general per-item progress tracker: each entry is untouched / auto / checked / cleared. Auto-fill syncs it from game memory. Ships with placeholder rows only - fill in CHK_CATS with your game's collectibles."),
-    IT_TOOL("Game Guide",   T_GAMEGUIDE,   "A scrollable, categorized reader for your game's content. Ships with placeholder pages - replace them, or drop guide/English/game.txt on the SD card."),
-    IT_TOOL("Plugin Guide", T_PLUGINGUIDE, "How to use this plugin: the menu, the quick menu, and the Cheat Search / RAM Dumper / Hex Editor tools."),
-    IT_SEP("SYSTEM"),
-    IT_FOLDER("Tools",    F_TOOLS),
-    IT_FOLDER("Settings", F_SETTINGS),
-};
-#endif
-#if !TOOLS_ONLY
-static const Item toolsItems[] = {
-    IT_TOOL("Cheat Search", T_SEARCH,  "Search the game's RAM for a value, then narrow it down (greater/less/changed...) to find its address. Poke results directly."),
-    IT_TOOL("RAM Dumper",   T_RAMDUMP, "Save a block of the game's memory to a .bin file on the SD card. Pick a start address and size, or pull the address from Cheat Search."),
-    IT_TOOL("Hex Editor",   T_HEXEDIT, "Browse memory as a live hex grid and edit any byte on the spot. Jump to an address, or to your Cheat Search result. Read-only regions are protected."),
-    IT_TOOL("About",        T_ABOUT,   "Plugin info and credits."),
-};
-
-// EXAMPLE cheats - these demonstrate the shapes a cheat can take. Delete them and write your
-// own; the descriptions are what the info box ({X}) shows.
-// EVERY row here is INERT: EXAMPLE_ENABLED is 0, so toggling them writes nothing at all.
-// They exist so you can walk the menu - navigation, auto-repeat, the {X} info box, {Y}
-// favorites, toasts, the checkbox-vs-action distinction - before you have a single address.
-static const Item exampleItems[] = {
-    IT_SEP("CONTINUOUS (toggles)"),
-    IT_CHEAT("Example: direct write",  CH_EX_DIRECT,
-             "EXAMPLE - inert until you edit it. Writes a fixed 16-bit value to a fixed address every frame while it is on. The simplest kind of cheat: see EXAMPLE_ADDR_DIRECT in Sources/main.c."),
-    IT_CHEAT("Example: byte write",    CH_EX_BYTE,
-             "EXAMPLE - inert until you edit it. Same idea, but 8-bit. Match the write width (W8 / W16 / W32) to whatever the game actually stores at that address, or you will clobber the bytes next door."),
-    IT_CHEAT("Example: 32-bit write",  CH_EX_WORD,
-             "EXAMPLE - inert until you edit it. A 32-bit write, for counters and pointers that are a full word wide."),
-    IT_CHEAT("Example: base + offset", CH_EX_BASEOFF,
-             "EXAMPLE - inert until you edit it. Reads a pointer to the player struct, then writes a field at a fixed offset inside it. ALWAYS null-check the base before writing through it."),
-    IT_CHEAT("Example: hold {HK}",     CH_EX_HOTKEY,
-             "EXAMPLE - inert until you edit it. Only acts while you hold {HK} in game. Rebind that button in Settings - this text shows the live binding, because the token is swapped for the real glyph when the card opens."),
-    IT_SEP("ONE-SHOT (actions)"),
-    IT_CHEAT("Example: apply once",    CH_EX_ONESHOT,
-             "EXAMPLE - inert until you edit it. Applied once, the moment you press {A}, instead of every frame. Use this for 'give me the item' style cheats. Note it gets a plain box, not a checkbox: it has no on/off state."),
-    IT_CHEAT("Example: toggle a bit",  CH_EX_ONESHOT2,
-             "EXAMPLE - inert until you edit it. A one-shot that flips a bit and then reads it back, so the flash says ADDED or REMOVED instead of just OK. Good for equipment-style cheats."),
-    IT_SEP("PICKER"),
-    IT_PICKER("Example: pick a value", PK_EXAMPLE,
-              "EXAMPLE - inert until you edit it. Opens a list and writes the value you choose to one address. Because the address is still a placeholder, it will refuse the write and say so rather than poking address zero."),
-};
-#endif // !TOOLS_ONLY
-
-static const Item settingsItems[] = {
-    IT_SEP("GENERAL"),
-#if TOOLS_ONLY
-    IT_CHEAT("Change Theme", CH_CFG_THEME, "Recolor every menu live. Your pick is saved to the SD card."),
-    IT_CHEAT("Language", CH_CFG_LANG, "Press {A} to cycle the menu language. Translations load from the plugin folder, under lang/. English is built in."),
-#else
-    IT_CHEAT("Change Theme", CH_CFG_THEME, "Recolor every menu live. The template ships one neutral theme; add your own to THEMES[] in Includes/themes.h. Your pick is saved."),
-    IT_CHEAT("Language", CH_CFG_LANG, "Press {A} to cycle the menu language. Translations load from <plugin folder>/lang/. The template ships English only."),
-#endif
-    IT_CHEAT("Toggle notifications (toast)", CH_CFG_TOAST, "Shows a small notification in-game when something is toggled."),
-#if !TOOLS_ONLY
-    IT_CHEAT("Auto-fill Tracker on open", CH_CFG_AUTOFILL, "When on, the Tracker syncs itself from game memory every time you open it."),
-#endif
-    IT_SEP("IN-GAME HOTKEYS"),
-    IT_CHEAT("Quick Menu hotkey", CH_CFG_QMKEY, "Press {A} to cycle the button combo that opens the quick menu in game."),
-#if !TOOLS_ONLY
-    IT_CHEAT("Example hotkey 1", CH_CFG_HK1, "Press {A} to cycle the button used by the 'hold' example cheat."),
-    IT_CHEAT("Example hotkey 2", CH_CFG_HK2, "Press {A} to cycle a second in-game hotkey. Wire it to one of your own cheats."),
-#endif
-    IT_CHEAT("Reset hotkeys to default", CH_CFG_HKRESET, "Press {A} to restore the Quick Menu and example hotkeys to their defaults ({L}+SELECT / {Y} / {X})."),
-};
-
-#define FCOUNT(a) (int)(sizeof(a) / sizeof((a)[0]))
-static const Folder folders[NUM_FOLDERS] = {
-#if TOOLS_ONLY
-    { "CTRComposer Tools",    rootItems,     FCOUNT(rootItems) },
-    { "Settings",             settingsItems, FCOUNT(settingsItems) },
-#else
-    { "CTRComposer Template", rootItems,     FCOUNT(rootItems) },
-    { "Examples",             exampleItems,  FCOUNT(exampleItems) },
-    { "Tools",                toolsItems,    FCOUNT(toolsItems) },
-    { "Settings",             settingsItems, FCOUNT(settingsItems) },
-#endif
-};
+#include "plugin/menu_tables.inc.c"
 
 static u8  folderFav[NUM_FOLDERS]; // folders starred for the quick menu (own Favorites lines, '#'-prefixed)
 static u8  toolFav[NUM_TOOLS];     // tools starred for the quick menu (own Favorites lines, '&'-prefixed)
@@ -1340,20 +1060,6 @@ static void BrownBoxS(int x, int y)
 {
     CFillBlend(x, y, 9, 9, 0, 0, 0, 70);
 }
-// True only for genuine on/off toggles - the cheats ApplyCheats() holds continuously.
-// Everything else is a one-shot action or a shortcut, and gets a plain tinted box instead
-// of a checkbox, so the menu never shows an "off" checkbox next to something that isn't
-// stateful. KEEP THIS IN SYNC with the cheatState[] uses in ApplyCheats().
-static int IsToggleCheat(int id)
-{
-    switch (id)
-    {
-        case CH_EX_DIRECT: case CH_EX_BYTE: case CH_EX_WORD:
-        case CH_EX_BASEOFF: case CH_EX_HOTKEY:
-            return 1;
-        default: return 0;
-    }
-}
 static int C6Width(const char *s)
 {
     int n = 0;
@@ -1530,17 +1236,7 @@ static void DrawScaled(int dx, int dy, int dw, int dh, const u16 *px, int sw, in
 #define SPRK_PIN      0x1F7
 #define SPRK_PORTAL   0x1F8
 
-// Which icon illustrates each cheat row (-1 = none, which is fine for most rows).
-// EXAMPLE mapping - repoint these at your own cheats, or just return -1 everywhere.
-static int SpriteKeyForCheat(int ch)
-{
-    switch (ch)
-    {
-        case CH_EX_DIRECT:  return SPRK_PIN;
-        case CH_EX_HOTKEY:  return SPRK_CLOCK;
-    }
-    return -1;
-}
+#include "plugin/cheat_icons.inc.c"
 
 // ---- hand-drawn 16px icons (things the item sheet doesn't have) ----
 static void CDisc(int cx, int cy, int r, u8 R, u8 G, u8 B)
@@ -3976,16 +3672,8 @@ typedef struct {
 } ChkItem;
 typedef struct { const char *name; const ChkItem *items; int count; } ChkCat;
 
-static const ChkItem CK_EXAMPLE[] = {
-    // key            task                  hint                                   location   icon        arg  kind        addr  mask
-    { "ex_manual",   "Example: manual only", "Nothing in memory tells us about this one, so you tick it yourself with {A}.", "", CKI_KEYITEM, 0, CK_MANUAL,  0x00000000, 0x00 },
-    { "ex_bit",      "Example: flag bit",    "Auto-detected when a chosen bit is set in a chosen byte. Point addr/mask at your game.", "", CKI_NOTE,    0, CK_BIT,     0x00000000, 0x01 },
-    { "ex_nonzero",  "Example: slot filled", "Auto-detected when a byte is anything other than zero - good for 'is this inventory slot used'.", "", CKI_SKULL, 0, CK_NONZERO, 0x00000000, 0x00 },
-};
+#include "plugin/tracker_data.inc.c"
 
-static const ChkCat CHK_CATS[] = {
-    { "Examples", CK_EXAMPLE, (int)(sizeof(CK_EXAMPLE) / sizeof(CK_EXAMPLE[0])) },
-};
 #define CHK_NCATS  ((int)(sizeof(CHK_CATS) / sizeof(CHK_CATS[0])))
 #define CHK_MAXITEMS 32
 #define CHK_LEAF "Tracker.txt"
