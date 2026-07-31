@@ -1,7 +1,7 @@
 # Migração para a estrutura CTRComposer — guia para os plugins derivados
 
 > **Para quem é este arquivo:** uma sessão do Claude Code trabalhando dentro do
-> `ZeldaOOTplugin` ou do `SegundoPluginDerivado`. É auto-contido: você não precisa do histórico da
+> `ZeldaOOTplugin` ou do segundo plugin derivado. É auto-contido: você não precisa do histórico da
 > conversa que o gerou.
 >
 > **Como usar:** abra a sessão na pasta do plugin, aponte para este arquivo e diga
@@ -43,13 +43,13 @@ dentro do seu plugin.**
 Isso não é excesso de cuidado. Os três projetos **divergiram de verdade**, e cada um tem trabalho
 legítimo que o template não tem. Medido, não suposto:
 
-| | CTRComposer | ZeldaOOTplugin | SegundoPluginDerivado |
+| | CTRComposer | ZeldaOOTplugin | 2º plugin derivado |
 |---|---|---|---|
 | linhas no `main.c` | 250 (já migrado) | 6.172 | 6.616 |
 | headers em `includes/` | 8 | **13** | **12** |
 | arte própria | nenhuma | `sprites.h` `topbg.h` `botbg.h` `logo.h` `kbkeys.h` | `sprites.h` `topbg.h` `botbg.h` `logo.h` |
 | `TOOLS_ONLY` | 21 pontos | **0 — não existe** | 24 pontos |
-| `PLUGIN_DIR` | vazio | **não existe** | `00040000000XXXXX` |
+| `PLUGIN_DIR` | vazio | **não existe** | preenchido com o Title ID |
 | seção `Item sprites (from sprites.h)` | não tem | tem | tem |
 
 O motor do template foi **esvaziado de propósito** (é um template em branco: sem sprites, sem
@@ -126,7 +126,7 @@ template — é só `arm-none-eabi-nm` com normalização.
 
 ```bash
 make clean && make
-ls *.elf                       # OoT: RawPlugin.elf   segundo plugin: SegundoPlugin.elf
+ls *.elf                       # o nome vem do TARGET no seu Makefile
 cp SEU.3gx /tmp/base.3gx
 sh Tools/fingerprint.sh SEU.elf > /tmp/base.fp
 ```
@@ -265,7 +265,7 @@ for f in sources/main.c sources/plugin/*.inc.c sources/engine/*.inc.c; do
 done
 ```
 
-*(Só se aplica ao segundo plugin. O OoT não tem `TOOLS_ONLY` nenhum.)*
+*(Só se aplica ao 2º plugin. O OoT não tem `TOOLS_ONLY` nenhum.)*
 
 ### 2. Não ache o fim de uma função procurando `}` sozinho numa linha
 
@@ -288,7 +288,7 @@ seção `Cheat implementations`, entre as suas funções de cheat:
 | | seção `Cheat implementations` | `ARepeat()` |
 |---|---|---|
 | OoT | linhas 700–1037 | **953** |
-| segundo plugin | linhas 807–1190 | **985** |
+| 2º plugin | linhas 807–1190 | **985** |
 
 Se você recortar a seção inteira para `plugin/cheats.inc.c`, leva o `ARepeat` junto — e aí o
 arquivo "que você edita" tem motor no meio. **Tire o `ARepeat` primeiro**, para
@@ -315,7 +315,7 @@ não renomeie a pasta `RawPlugin` no meio da migração.
 ## Notas por plugin
 
 > ⚠️ **Os números de linha abaixo são de 31/07/2026 e vão envelhecer.** Estes plugins estão em
-> desenvolvimento ativo em sessões paralelas — o `main.c` do segundo plugin já cresceu de 6.260 para 6.616
+> desenvolvimento ativo em sessões paralelas — o `main.c` do 2º plugin já cresceu de 6.260 para 6.616
 > linhas entre o planejamento e este documento. **Trate os números como "onde procurar", nunca
 > como endereço.** Confirme sempre com `grep -n` antes de cortar. O que **não** envelhece são os
 > nomes de função e de seção.
@@ -344,18 +344,17 @@ não renomeie a pasta `RawPlugin` no meio da migração.
 - `ToolRun()` está na **linha 5292**, logo antes de `Game pause` — mesma posição que o template
   tinha. Vale tirá-lo para `engine/tool_dispatch.inc.c`, como descrito na tabela.
 
-### SegundoPluginDerivado
+### O segundo plugin derivado
 
 - **Tem `TOOLS_ONLY` (24 pontos condicionais).** A armadilha nº 1 vale para você. Vale a pena
   fazer o que o template fez: onde o `#if` envolve uma seção inteira, tire-o de dentro do arquivo
   e ponha em volta do `#include` no `main.c`.
 - Estrutura **mais próxima do template** que o OoT: já tem `Where this plugin keeps its files`
-  (com o Title ID `00040000000XXXXX` preenchido) e a seção `Sprites (RGBA4444 art)` genérica
-  separada de `Item sprites`.
-- `TARGET := SegundoPlugin` → o `.elf` é `SegundoPlugin.elf`.
+  (com o Title ID do jogo preenchido) e a seção `Sprites (RGBA4444 art)` genérica separada de
+  `Item sprites`.
 - Tem **duas** seções de sprite, e tem `DrawScaled()` (**2076**) — ao contrário do OoT. Mantenha as
   duas separadas: `engine/sprites.inc.c` (blit genérico) e `plugin/item_sprites.inc.c` (a arte que
-  você mapeou para os itens do segundo plugin).
+  você mapeou para os itens do seu jogo).
 - `PLUGIN_PAGES[]` aparece **duas vezes** (**4553** e **4611**): é o par `#if TOOLS_ONLY` /
   `#else`, idêntico ao que o template tinha. Ao migrar, a versão do template (a do `#else`) é
   conteúdo seu → `plugin/guide_text.inc.c`, junto do `GUIDE_CREDITS` (**4482**). A versão
