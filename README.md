@@ -155,62 +155,127 @@ Sources/
 
 ---
 
-## What CTRComposer is
+## Make it yours — a checklist
 
-A C plugin that renders its own UI directly to the framebuffer: a themeable window, the system
-font, folder menus, tools and themes. It runs **inside the game's process** (same address
-space → writing memory is just a pointer) and draws everything itself, so a plugin is
-**self-contained and portable across games and Luma3DS versions**.
+Work down this list and you have your own plugin. Everything not listed is engine you inherit
+as-is.
 
-CTRComposer grew out of — and owes a great deal to — **CTRPluginFramework** and the earlier
-community `.plg` plugins. Those projects made 3DS plugins possible and are the direct
-inspiration here. CTRComposer is meant as a **framework to build new plugins from scratch, or
-to revive older `.plg`/`.3gx` plugins** that no longer load on current Luma3DS builds — giving
-that work a fresh, self-rendered foundation that doesn't depend on any particular framework
-build matching the game.
+> Every file you touch below is in [`Sources/plugin/`](Sources/plugin). If a step sends you into
+> `Sources/engine/`, it is optional polish, not required work.
 
-**About 90% of the code is game-independent.** A new plugin is essentially a **cheat table +
-art + Title ID**. Everything else (rendering, font, pause, persistence, menu, themes, tools,
-guide) is reused as-is.
+**1. Name it.**
+- `Makefile` → `TARGET` (the output `.3gx` filename) and `PLGINFO`.
+- Rename `CTRComposer.plgInfo` to match `PLGINFO`; set `Author`, `Title`, `Summary`.
+- `Sources/plugin/identity.inc.c` → `PLUGIN_NAME` and the version. The version is three numbers
+  (`PLUGIN_VER_MAJOR/MINOR/PATCH`); the on-screen strings `PLUGIN_VER` and `PLUGIN_TAG` are built
+  from them, so you bump one place, not two.
 
-**Engine capabilities already built in — all optional, all yours to configure:**
-- A **folder menu primitive** (`Item` / `Folder`, section headers, category icons) with layout
-  left to the creator: a single-column list, a multi-column grid, groups with separators —
-  whatever fits the plugin. The reference build happens to use a 2-column HOME grid, but that's
-  one choice among many, not a rule of the engine.
-- A **live theme-switch mechanism** (recolor every menu instantly, no call-site changes — see
-  section 7), with **auto-contrast** so text stays readable on both light- and dark-background
-  themes. The template ships with **one neutral, monochrome starter theme** (near-black
-  background, white/light-grey text, no colored accent — the plain CTRPluginFramework-style look,
-  not any specific game's palette) so a fresh plugin doesn't inherit a Zelda color scheme by
-  default. Add as many themes as you want, or none at all.
-- A **sprite system**: RGBA4444 icon sprites with alpha, a **nearest-neighbour scaled blit** for
-  art of any size, hand-drawn vector icons as an art-free alternative, and **inline button-glyph
-  tokens** (`{A}`/`{B}`/`{D-Pad}`…) that render as icons inside any label or hint (see section 4).
-- Tools: **Cheat Search** (known/unknown + undo + regions), **RAM Dumper**, **Hex Editor**, **About**
-- A **guide reader** (scrollable embedded text, word-wrap + resume) you can point at *your*
-  game's content — or skip entirely if the plugin doesn't need one. A **Plugin Guide** (how-to-use
-  pages for the plugin itself) is the same reader with generic, game-agnostic content; write your
-  own pages instead of copying game-specific ones from another build.
-- A **UI localization mechanism** (`T("English source")` → looked up in an SD text file per
-  language, English embedded as the always-available fallback — see section 7). The template
-  ships **English-only**; add language files only if the plugin wants more than one, in whichever
-  languages the creator picks.
-- Toast notifications; a **favorites quick menu** (favourite cheats, *and* folder / tool shortcuts);
-  an on-screen numeric keypad (skinnable with sprites); **auto-repeat** (hold a D-pad direction to
-  keep scrolling); **rebindable in-game hotkeys**; SD-card persistence with config migration.
-- **SELECT** = return to the game from any screen; reopening resumes exactly where you left off (even inside a tool)
+**2. Find your Title ID** in a 3DS Title ID database — and confirm *which region* is yours;
+adjacent region numbers are easy to mix up, and a cheat from the wrong region writes to the wrong
+address. Install under `luma/plugins/<TitleID>/`. Optionally add it to `Targets:` in the
+`.plgInfo` so the plugin only loads for that game.
+
+**3. Write your cheat table** — the one genuinely game-specific job (section 3 below goes deep on
+this).
+- Get addresses from an existing source (a `.plg`, an AR code bank, a community plugin) or find
+  them with the built-in **Cheat Search**. They are **region- and version-specific**.
+- For `base + offset` cheats you also need the **player base pointer** — one address to find once,
+  then every stat hangs off it.
+- Add `CH_*` entries to the enum in `plugin/cheat_ids.inc.c`, the writes to `ApplyCheats()`
+  (continuous) or `OneShot()` (applied once) in `plugin/cheats.inc.c`, and the rows to a `Folder`
+  in `plugin/menu_tables.inc.c`.
+- Set `EXAMPLE_ENABLED` (in `plugin/cheats.inc.c`) to `1` only after you have replaced the
+  placeholder addresses, and delete the `CH_EX_*` examples once you no longer need them.
+- Update `IsToggleCheat()` — same file, right below `ApplyCheats()` — so on/off cheats get a
+  checkbox and one-shots get a plain box.
+
+**4. Lay out your menu.** In `plugin/menu_tables.inc.c`: `folders[]` and the `Item` rows are pure
+data. HOME is a 2-column grid and everything else is a list — that is a choice made in one line of
+`ComposeMenu()` (`engine/menu_render.inc.c`), not a rule.
+
+**5. Theme it.** Add rows to `THEMES[]` in `Includes/themes.h`, or ship the single neutral one.
+Auto-contrast keeps text readable on light and dark backgrounds without per-theme tweaking.
+
+**6. Art (optional).** The template is art-free: vector icons drawn from primitives, a
+code-drawn keypad, no logo. To add real art, embed it as RGBA4444 and blit with `DrawImg()` or
+`DrawScaled()` — and **pack with round-to-nearest**, `clamp((c + 8) / 17, 0, 15)`, or your art
+comes out visibly brighter than the source. `Assets/gen_glyphs.py` is a worked example.
+
+**7. Guides and languages (optional).** There are two separate guides:
+- The **Plugin Guide** explains *your plugin* — its pages live in `plugin/guide_text.inc.c`,
+  along with the guide credits page.
+- The **Game Guide** carries *your game's* walkthrough — placeholder pages in `Includes/guide.h`.
+
+Either can be replaced at runtime instead of in C: drop
+`<plugin dir>/guide/English/{plugin,game}.txt` on the SD card and it overrides the embedded
+pages. Translations are `lang/<Name>.txt` files keyed by the English string; missing entries
+fall back to English.
+
+**8. Tracker (optional).** Fill `CHK_CATS` in `plugin/tracker_data.inc.c` with your collectibles
+and give each a detection kind (`CK_BIT` / `CK_BYTEEQ` / `CK_NONZERO`), or leave it as-is, or
+delete the Tracker row from `rootItems[]` in `plugin/menu_tables.inc.c`.
+
+**9. Iterate on hardware.** Bump the version in `plugin/identity.inc.c` **every** build and check
+it on screen — it is your proof that the `.3gx` on the SD card is the one you just compiled.
+Verify the bump actually landed; a blind `sed` can silently no-op and freeze the on-screen
+version.
+
+### Build gotchas worth re-reading
+
+- Build from a **space-free path**, through the **devkitPro msys2 shell** — not git-bash.
+  A space gives you `make[1]: /d/My Project: Is a directory`.
+- **One `.3gx` per plugin folder.**
+- **3gxtool 1.3** writes the `3GX$0002` container Luma expects; `3GX$0001` is rejected.
+- Never call `hidInit()` — on New 3DS it pulls in `irrst` and freezes the game.
+- Assume **ZL/ZR are unreachable** from a plugin. Use L/R combos.
+
+### When something misbehaves, prove the plugin is involved first
+
+Before debugging your plugin, **reproduce the fault with the plugin deleted from the SD card.**
+
+This is not hypothetical advice. A hang on relaunching one particular game was chased through
+the engine for hours here — exit handshakes, memory reservations, leaked handles, binary size —
+before the obvious test was run. With the `.3gx` removed entirely, the game hung exactly the
+same way: it was the game and the screen-streaming CFW in use, and the plugin had never been
+part of it. One 30-second test would have replaced all of that.
+
+Running inside someone else's process makes a plugin a magnet for blame. Make it prove its
+guilt.
 
 ---
 
-## Design in one paragraph
+## What the engine gives you
 
-Because CTRComposer draws its own UI and uses **no game hooks**, the same engine runs unchanged
-across titles and Luma versions — there are no fixed hook-wrapper addresses or per-game memory
-assumptions to line up. That portability is the whole point: write the engine once, and each
-new game only needs its own cheats, art and Title ID.
+The plugin renders its own UI straight to the framebuffer and runs **inside the game's process**,
+so writing memory is just a pointer. It uses **no game hooks** — nothing to re-anchor when Luma3DS
+updates or when you move to another title. That portability is the whole point, and it is also
+what makes reviving an old `.plg`/`.3gx` that no longer loads a realistic project.
+
+Roughly **90% of the code is game-independent**. This is that 90%:
+
+| | |
+|---|---|
+| **Menu** | Folder model with section headers and icons; layout is yours (list, grid, whatever fits). |
+| **Themes** | Live switching with no call-site changes, plus auto-contrast so text stays readable on light and dark backgrounds. Ships one neutral theme. |
+| **Art** | RGBA4444 sprites with alpha, scaled blit for any source size, vector icons as an art-free fallback, and inline button glyphs (`{A}`, `{D-Pad}`…) inside any label. |
+| **Tools** | Cheat Search (known/unknown, undo, region filter), RAM Dumper, Hex Editor, About. |
+| **Guides** | A scrollable reader with word-wrap and resume — one guide for your game, one for your plugin. Pages come from C or from the SD card. |
+| **Text** | `T("English")` localization backed by SD language files, English always embedded as fallback. |
+| **Quality of life** | Toasts, favourites quick menu, on-screen keypad, D-pad auto-repeat, rebindable hotkeys, SD persistence with config migration. |
+
+**SELECT** returns to the game from any screen, and reopening resumes exactly where you left off —
+even mid-tool.
+
+Each of these is detailed in the walkthrough below, and each is optional: use what the plugin
+needs and ignore the rest.
 
 ---
+
+## How it works, section by section
+
+Reference material: how a self-rendered 3DS overlay plugin is built, from the
+toolchain up. You do **not** need any of this to use the template — it is here for
+when you want to change the engine, or port the technique somewhere else.
 
 ## 1 · Toolchain and skeleton
 
@@ -585,127 +650,6 @@ binding (A/X/Y/L/R) and a "reset hotkeys" entry restores defaults. The binding p
 and the live glyph shows in the cheat's info via an inline button token (section 4).
 
 ---
-
-## 8 · New-game checklist
-
-1. **Title ID and region** (a 3DS Title ID database; confirm *which* region is yours — adjacent
-   region numbers are easy to mix up). Install under `luma/plugins/<TitleID>/`.
-2. **Cheat table** (section 3): an existing source or Cheat Search. **Region-specific.**
-3. **Player base pointer** for base+offset cheats.
-4. **Reuse the whole engine** (section 7) — none of it depends on the game, and it is already
-   fenced off in `Sources/engine/`.
-5. **Change only what is in `Sources/plugin/`:** the cheat table, the menu rows, your art and the
-   Title ID. Everything else — menu layout, theme(s), whether to include a Game Guide, which (if
-   any) languages beyond English, how many tools to expose — is a choice, not a requirement; add
-   only what the plugin needs.
-6. **Iterate on hardware.** Put the version on screen and bump it every build.
-
----
-
-## 9 · Build & deploy (reference)
-
-```sh
-# build through the devkitPro msys2 shell (space-free path):
-/c/devkitPro/msys2/usr/bin/bash.exe -lc 'cd <project> && make'
-# deploy: copy the .3gx to the SD card, one per folder:
-cp <project>/plugin.3gx  <SD>/luma/plugins/<TitleID>/<Name>.3gx
-```
-
----
-
-> **What you get for free** — about 90% is game-independent. A new plugin is: **cheats + art +
-> Title ID**. The hard part — overlay rendering, the system font, pausing, persistence, the menu,
-> themes and tools in a self-rendered plugin — is solved and documented here, and doesn't change
-> from game to game.
->
-> Technique credits: rendering approach informed by CTRPluginFramework; loader by Luma3DS /
-> PabloMK7. 3DS hardware/kernel addresses hold for any game; the `<like-this>` values you
-> re-anchor per game and version.
-
----
-
-## Make it yours — a checklist
-
-Work down this list and you have your own plugin. Everything not listed is engine you inherit
-as-is.
-
-> Everything in steps 1–8 lives in [`Sources/plugin/`](Sources/plugin). If a step sends you into
-> `Sources/engine/`, it is optional polish, not required work.
-
-**1. Name it.**
-- `Makefile` → `TARGET` (the output `.3gx` filename) and `PLGINFO`.
-- Rename `CTRComposer.plgInfo` to match `PLGINFO`; set `Author`, `Title`, `Summary`.
-- `Sources/plugin/identity.inc.c` → `PLUGIN_NAME` and the version. The version is three numbers
-  (`PLUGIN_VER_MAJOR/MINOR/PATCH`); the on-screen strings `PLUGIN_VER` and `PLUGIN_TAG` are built
-  from them, so you bump one place, not two.
-
-**2. Find your Title ID** (section 8). Install under `luma/plugins/<TitleID>/`. Optionally add
-it to `Targets:` in the `.plgInfo` so the plugin only loads for that game. You do *not* need to
-put it in the source — the plugin discovers its own folder at runtime.
-
-**3. Write your cheat table** — the one genuinely game-specific job (section 3).
-- Get addresses from an existing source (a `.plg`, an AR code bank, a community plugin) or find
-  them with the built-in **Cheat Search**. They are **region- and version-specific**.
-- Add `CH_*` entries to the enum in `plugin/cheat_ids.inc.c`, the writes to `ApplyCheats()`
-  (continuous) or `OneShot()` (applied once) in `plugin/cheats.inc.c`, and the rows to a `Folder`
-  in `plugin/menu_tables.inc.c`.
-- Set `EXAMPLE_ENABLED` (in `plugin/cheats.inc.c`) to `1` only after you have replaced the
-  placeholder addresses, and delete the `CH_EX_*` examples once you no longer need them.
-- Update `IsToggleCheat()` — same file, right below `ApplyCheats()` — so on/off cheats get a
-  checkbox and one-shots get a plain box.
-
-**4. Lay out your menu.** In `plugin/menu_tables.inc.c`: `folders[]` and the `Item` rows are pure
-data. HOME is a 2-column grid and everything else is a list — that is a choice made in one line of
-`ComposeMenu()` (`engine/menu_render.inc.c`), not a rule.
-
-**5. Theme it.** Add rows to `THEMES[]` in `Includes/themes.h`, or ship the single neutral one.
-Auto-contrast keeps text readable on light and dark backgrounds without per-theme tweaking.
-
-**6. Art (optional).** The template is art-free: vector icons drawn from primitives, a
-code-drawn keypad, no logo. To add real art, embed it as RGBA4444 and blit with `DrawImg()` or
-`DrawScaled()` — and **pack with round-to-nearest**, `clamp((c + 8) / 17, 0, 15)`, or your art
-comes out visibly brighter than the source. `Assets/gen_glyphs.py` is a worked example.
-
-**7. Guides and languages (optional).** There are two separate guides:
-- The **Plugin Guide** explains *your plugin* — its pages live in `plugin/guide_text.inc.c`,
-  along with the guide credits page.
-- The **Game Guide** carries *your game's* walkthrough — placeholder pages in `Includes/guide.h`.
-
-Either can be replaced at runtime instead of in C: drop
-`<plugin dir>/guide/English/{plugin,game}.txt` on the SD card and it overrides the embedded
-pages. Translations are `lang/<Name>.txt` files keyed by the English string; missing entries
-fall back to English.
-
-**8. Tracker (optional).** Fill `CHK_CATS` in `plugin/tracker_data.inc.c` with your collectibles
-and give each a detection kind (`CK_BIT` / `CK_BYTEEQ` / `CK_NONZERO`), or leave it as-is, or
-delete the Tracker row from `rootItems[]` in `plugin/menu_tables.inc.c`.
-
-**9. Iterate on hardware.** Bump the version in `plugin/identity.inc.c` **every** build and check
-it on screen — it is your proof that the `.3gx` on the SD card is the one you just compiled.
-Verify the bump actually landed; a blind `sed` can silently no-op and freeze the on-screen
-version.
-
-### Build gotchas worth re-reading
-
-- Build from a **space-free path**, through the **devkitPro msys2 shell** — not git-bash.
-  A space gives you `make[1]: /d/My Project: Is a directory`.
-- **One `.3gx` per plugin folder.**
-- **3gxtool 1.3** writes the `3GX$0002` container Luma expects; `3GX$0001` is rejected.
-- Never call `hidInit()` — on New 3DS it pulls in `irrst` and freezes the game.
-- Assume **ZL/ZR are unreachable** from a plugin. Use L/R combos.
-
-### When something misbehaves, prove the plugin is involved first
-
-Before debugging your plugin, **reproduce the fault with the plugin deleted from the SD card.**
-
-This is not hypothetical advice. A hang on relaunching one particular game was chased through
-the engine for hours here — exit handshakes, memory reservations, leaked handles, binary size —
-before the obvious test was run. With the `.3gx` removed entirely, the game hung exactly the
-same way: it was the game and the screen-streaming CFW in use, and the plugin had never been
-part of it. One 30-second test would have replaced all of that.
-
-Running inside someone else's process makes a plugin a magnet for blame. Make it prove its
-guilt.
 
 ## Continuous integration
 
