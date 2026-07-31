@@ -22,8 +22,8 @@
 // no-op silently. PLUGIN_TAG below is derived from these, not typed again - a stray hand-edit of
 // just one of the two used to slip past the CI, which sedded TOOLS_ONLY/PLUGIN_NAME only.
 #define PLUGIN_VER_MAJOR 1
-#define PLUGIN_VER_MINOR 0
-#define PLUGIN_VER_PATCH 1
+#define PLUGIN_VER_MINOR 1
+#define PLUGIN_VER_PATCH 0
 
 #define PLUGIN_STR2(x) #x
 #define PLUGIN_STR(x) PLUGIN_STR2(x)

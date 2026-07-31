@@ -1,8 +1,12 @@
 Author: Your Name
 
-Version: # Plugin version - bump this every release
+Version: # Plugin version - bump this every release.
+    # Keep in sync with PLUGIN_VER_MAJOR/MINOR/PATCH in Sources/plugin/identity.inc.c.
+    # This block is read by the loader; those macros draw the version on screen. They cannot
+    # be derived from each other (different file formats), so this is the one version number
+    # that still has to be edited twice.
     Major: 1
-    Minor: 0
+    Minor: 1
     Revision: 0
 
 # Low TitleIds of the games this plugin is compatible with, one per line, e.g.

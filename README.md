@@ -719,8 +719,13 @@ the older `3GX$0001` builds fine and then silently refuses to load — and it fa
 `default.3gx` ever mentions a menu it doesn't have.
 
 ```sh
-git tag v1.0.0 && git push origin v1.0.0   # cut a release
+git tag vX.Y.Z && git push origin vX.Y.Z   # cut a release
 ```
+
+Bump the version in **two** places before tagging: `PLUGIN_VER_MAJOR/MINOR/PATCH` in
+[`Sources/plugin/identity.inc.c`](Sources/plugin/identity.inc.c) (drawn on screen) and the
+`Version:` block in the `.plgInfo` (read by the loader). They are different file formats, so
+neither can be derived from the other.
 
 ## Credits
 
