@@ -51,15 +51,27 @@
 
 #include "engine/tools.inc.c"
 
-#include "engine/guide.inc.c"
+#include "engine/guide_reader.inc.c"   // leitor generico, compartilhado pelos dois guias
 
-#include "engine/tracker.inc.c"
-
-#if !TOOLS_ONLY
-#include "plugin/tracker_data.inc.c"
+// O UNICO ponto onde as duas builds divergem no guia. A universal descreve a si mesma e
+// nao tem Game Guide; o template traz o texto editavel do autor e o leitor do guia do jogo.
+#if TOOLS_ONLY
+#include "engine/guide_text_tools.inc.c"
+#else
+#include "plugin/guide_text.inc.c"
+#include "engine/guide_game.inc.c"
 #endif
 
+#include "engine/guide_plugin.inc.c"
+
+// O tracker inteiro (tipos, dados do jogo e UI) so existe fora da build universal.
+#if !TOOLS_ONLY
+#include "engine/tracker.inc.c"
+#include "plugin/tracker_data.inc.c"
 #include "engine/tracker_ui.inc.c"
+#endif
+
+#include "engine/tool_dispatch.inc.c"
 
 #include "engine/menu_loop.inc.c"
 

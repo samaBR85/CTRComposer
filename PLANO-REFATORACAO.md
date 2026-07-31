@@ -236,20 +236,57 @@ Guia de corte (os números vêm do mapa real do `main.c`):
 
 ---
 
-## Etapa 5 — Repensar o `TOOLS_ONLY` 🟡
+## Etapa 5 — Repensar o `TOOLS_ONLY` 🟡 ✅ *(feita — com a premissa corrigida)*
 
 **Modelo sugerido: Opus** — decisão de design, sem resposta óbvia.
-**Risco: médio** (mexe nas duas builds).
+**Risco real: baixo** (o oráculo byte a byte continuou valendo; a estimativa "médio" era pessimista).
 
 Hoje um `#define` liga/desliga blocos `#if` espalhados pelo arquivo inteiro. Funciona — a CI
 compila as duas — mas obriga quem lê a simular o pré-processador mentalmente: você nunca vê o
 programa que roda, vê os dois sobrepostos.
 
-Depois da Etapa 4 há uma saída mais limpa: se cada ferramenta virou um arquivo, a variante
-tools-only pode ser **uma lista diferente de `#include`** em vez de `#if` espalhado. O `main.c`
-da build universal simplesmente não inclui `tracker.inc.c` nem `guide.inc.c`.
+### A proposta original não se sustentou
 
-Fazer **depois** da Etapa 4, nunca antes.
+O plano dizia: *"a variante tools-only pode ser uma lista diferente de `#include` em vez de `#if`
+espalhado"*. Ao executar, isso se mostrou **errado como estratégia geral**. Dos 25 pontos
+condicionais que existiam, só ~6 eram blocos inteiros e auto-contidos. Os outros ~19 estão
+**dentro** de uma construção que um `#include` não alcança:
+
+- membros de `enum` (`F_EXAMPLES`, `T_TRACKER` — mudam o valor de `NUM_TOOLS`)
+- `case` dentro de `switch` (`case T_GAMEGUIDE:`)
+- elementos de inicializador de array (`kToolKeys[]`, as linhas do About)
+- corpos de `#define` (`PLUGIN_NAME`)
+
+Levada ao pé da letra, a proposta **adicionaria** uma condicional (a própria lista de includes)
+mantendo 19 das antigas, e espalharia a decisão por dois lugares em vez de um. Seria pior.
+
+### O que foi feito no lugar
+
+Só o subconjunto que de fato funciona — tudo verificado byte a byte:
+
+1. **`engine/guide.inc.c` (397 linhas, 4 `#if`) virou 5 arquivos com zero `#if`.** O leitor
+   genérico (`guide_reader`), o Game Guide (`guide_game`), o Plugin Guide (`guide_plugin`) e o
+   texto das páginas, agora selecionado por **uma única** condicional no `main.c`.
+2. **O texto do guia foi para `Sources/plugin/guide_text.inc.c`** — correção de uma falha da
+   Etapa 3: as páginas do Plugin Guide e a página de créditos são conteúdo que o autor do plugin
+   *deve* editar, e estavam enterradas no motor.
+3. **`ToolRun()` saiu do rabo de `tracker_ui.inc.c`** para `engine/tool_dispatch.inc.c`. Ele é o
+   despachante de ferramentas, não código de tracker — era uma emenda ruim da Etapa 4.
+4. **As 3 condicionais do tracker viraram 1**, em volta dos `#include` no `main.c`.
+   `tracker.inc.c` e `tracker_ui.inc.c` passaram a ser código comum, sem `#if` nenhum.
+
+Resultado: 25 → 21 pontos condicionais. O número caiu pouco, mas **nenhum arquivo do motor tem
+mais um `#if` envolvendo o corpo inteiro**, e os dois maiores blocos de dados duplicados saíram
+de `engine/`.
+
+### Os 21 que ficaram, e por que ficam
+
+São de 1 a 3 linhas cada, e estão exatamente onde a diferença é. Eliminá-los exigiria um
+**registro de ferramentas em runtime** (cada tool se cadastra num `{nome, ícone, run}`, arrays
+dimensionados em runtime, `switch` virando busca em tabela). Isso custaria ponteiros de função e
+bytes num binário que é carregado dentro da memória do jogo, e **destruiria o oráculo de
+verificação** — pela primeira vez uma etapa não poderia provar que não quebrou nada.
+Desproporcional para resolver 19 linhas espalhadas. **Recomendação: não fazer.**
 
 ---
 

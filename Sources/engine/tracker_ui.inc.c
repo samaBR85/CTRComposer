@@ -7,9 +7,6 @@
 // ============================================================================================
 
 // Estado, auto-fill e desenho do tracker de progresso.
-//
-// Continuacao do #if !TOOLS_ONLY aberto em engine/tracker.inc.c - fecha logo antes de ToolRun().
-#if !TOOLS_ONLY
 
 #define CHK_NCATS  ((int)(sizeof(CHK_CATS) / sizeof(CHK_CATS[0])))
 #define CHK_MAXITEMS 32
@@ -730,19 +727,4 @@ static void ToolChecklist(void)
             BotBlitComposeBoth();
         }
     }
-}
-
-#endif // !TOOLS_ONLY
-
-static void ToolRun(int t)
-{
-    if (t == T_SEARCH) ToolSearch();
-    else if (t == T_RAMDUMP) ToolRamDump();
-    else if (t == T_HEXEDIT) ToolHexEdit();
-    else if (t == T_ABOUT) ToolAbout();
-#if !TOOLS_ONLY
-    else if (t == T_GAMEGUIDE) ToolGameGuide();
-    else if (t == T_TRACKER)   ToolChecklist();
-#endif
-    else if (t == T_PLUGINGUIDE) ToolPluginGuide();
 }

@@ -8,11 +8,6 @@
 
 // Tipos do tracker de progresso (ChkItem/ChkCat) e os kinds de deteccao
 // automatica. Os dados de cada jogo vem de Sources/plugin/tracker_data.inc.c.
-//
-// O tracker inteiro (este arquivo + tracker_data.inc.c + tracker_ui.inc.c) so existe fora
-// da build TOOLS_ONLY - por isso o #if abre aqui e so fecha no fim de tracker_ui.inc.c
-// (main.c espelha o mesmo #if em volta do #include de plugin/tracker_data.inc.c).
-#if !TOOLS_ONLY
 
 // ===================== Completion tracker (per-item progress) =====================
 // Each item is in one of four states:
@@ -44,5 +39,3 @@ typedef struct {
     u32 addr; u8 mask;
 } ChkItem;
 typedef struct { const char *name; const ChkItem *items; int count; } ChkCat;
-
-#endif // !TOOLS_ONLY
