@@ -117,9 +117,10 @@ perde a única referência que importa.
 .PRECIOUS: %.elf
 ```
 
-**3. Copie `Tools/fingerprint.sh`** de `D:\Claude Code\CTRComposer\Tools\fingerprint.sh` para a
-mesma pasta no seu plugin. Ele não tem nada específico do template — é só `arm-none-eabi-nm`
-com normalização.
+**3. Copie `Tools/fingerprint.sh`** do repo do CTRComposer
+([github.com/samaBR85/CTRComposer](https://github.com/samaBR85/CTRComposer), arquivo
+`Tools/fingerprint.sh`) para a mesma pasta no seu plugin. Ele não tem nada específico do
+template — é só `arm-none-eabi-nm` com normalização.
 
 **4. Guarde a referência.** Descubra o nome do seu `.elf` (varia por plugin) e salve:
 
@@ -384,8 +385,9 @@ Ao terminar, confira:
 
 ## Referência
 
-A estrutura final do template está em `D:\Claude Code\CTRComposer\Sources\`. Use como **modelo de
+A estrutura final do template está em `Sources/` no repo do CTRComposer
+([github.com/samaBR85/CTRComposer](https://github.com/samaBR85/CTRComposer)). Use como **modelo de
 organização** — nunca como fonte de código para copiar.
 
 O histórico completo de decisões (incluindo uma proposta que foi testada e **rejeitada** por não
-funcionar) está em `D:\Claude Code\CTRComposer\PLANO-REFATORACAO.md`.
+funcionar) está em `PLANO-REFATORACAO.md`, no mesmo repo.
