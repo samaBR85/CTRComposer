@@ -340,10 +340,10 @@ Etapa 0  (rede de segurança)   ─┐
 Etapa 1  (bug de travamento)    ├─ fazer agora, são rápidas e independentes
 Etapa 2  (comentários)         ─┘
 
-        ↓  ← aqui: fazer o plugin do segundo plugin
+        ↓  ← aqui: fazer um plugin novo de verdade
 
 Etapa 3  (separar plugin.c)    ─┐
-Etapa 4  (dividir o motor)      ├─ depois do segundo plugin
+Etapa 4  (dividir o motor)      ├─ depois desse plugin
 Etapa 5  (TOOLS_ONLY)          ─┤
 Etapa 6  (cosmético)           ─┘
 Etapa 8  (migração derivados)  ── feita ao fim, com a estrutura já estável
@@ -351,12 +351,12 @@ Etapa 8  (migração derivados)  ── feita ao fim, com a estrutura já estáv
 Etapa 7  → provavelmente nunca
 ```
 
-**Por que o segundo plugin no meio:** as Etapas 3–4 reorganizam a área que o desenvolvedor edita. Fazer um
-plugin real *antes* mostra na prática o que incomoda — e a única metade do projeto que nunca foi
-testada de verdade é justamente a de cheats (os exemplos são inertes por construção). O segundo plugin é o
-primeiro teste real dela, e vai informar como `plugin.c` deve ficar.
+**Por que um plugin novo no meio:** as Etapas 3–4 reorganizam a área que o desenvolvedor edita.
+Fazer um plugin real *antes* mostra na prática o que incomoda — e a única metade do projeto que
+nunca foi testada de verdade é justamente a de cheats (os exemplos são inertes por construção).
+Um plugin novo é o primeiro teste real dela, e vai informar como `plugin.c` deve ficar.
 
-**Alternativa válida:** fazer 3–4 antes do segundo plugin, e já desenvolver o segundo plugin na estrutura nova. Como
+**Alternativa válida:** fazer 3–4 antes, e já desenvolver o plugin novo na estrutura nova. Como
 a verificação é byte a byte, o risco não é o argumento — o argumento é só não redesenhar o
 `plugin.c` sem ter usado ele de verdade uma vez.
 
@@ -376,16 +376,16 @@ migração", sem precisar de nenhum histórico.
 **O ponto crítico do documento:** os dois **não** têm o mesmo motor que o template. Eles
 divergiram, e o guia é *"reorganize na mesma estrutura"*, **nunca** *"substitua seu motor pelo
 nosso"* — isso apagaria trabalho legítimo deles. A divergência foi **medida**, não suposta, e a
-tabela está no documento: o OoT tem 13 headers e nenhum `TOOLS_ONLY`; o segundo plugin tem 12 headers e 24
-pontos condicionais; o template tem 8 headers. Ambos têm arte real (`sprites.h`, `topbg.h`,
+tabela está no documento: o OoT tem 13 headers e nenhum `TOOLS_ONLY`; o segundo tem 12 headers e
+24 pontos condicionais; o template tem 8 headers. Ambos têm arte real (`sprites.h`, `topbg.h`,
 `botbg.h`, `logo.h`) que o template não tem de propósito.
 
 **Achados da inspeção que entraram no guia:**
 - **O OoT não tem `DrawScaled()`** — a função simplesmente não existe nesse fork. Ele tem
   `DrawImg()` e `DrawSprite()` em posições diferentes. O guia manda casar **pela função, nunca
   pelo cabeçalho de seção**, e avisa que o OoT não terá um `engine/sprites.inc.c` equivalente.
-- **`ARepeat()` está encravado dentro de `Cheat implementations` nos dois plugins** (OoT L953,
-  segundo plugin L985) — a mesma armadilha que o template tinha. Recortar a seção inteira levaria motor
+- **`ARepeat()` está encravado dentro de `Cheat implementations` nos dois plugins** (L953 e L985)
+  — a mesma armadilha que o template tinha. Recortar a seção inteira levaria motor
   junto para dentro do arquivo "que você edita". O guia manda tirá-lo primeiro, em passo separado.
 - **Nomes de seção divergem**: o tracker do OoT se chama `Checklist 100%`, os pickers dele são
   `Pickers (bottle contents / inventory item)`, a janela é `(parchment window)`.
