@@ -5,6 +5,11 @@ build/
 *.o
 *.d
 
+# Built artifacts, ready to copy to the SD card. The toolchain cannot build from a path
+# containing spaces, so the actual compile happens in a mirror (see README); this is where
+# the results come back to, so everything about the project stays under the project.
+releases/
+
 # Scaffolding used to extract the blank engine - not part of the shipped repo.
 # (The reference plugin this template was stripped from, plus the source documents
 #  that became README.md. Safe to delete outright once you're happy.)

@@ -81,12 +81,21 @@ its own — the game behind the window is just whatever title it was loaded into
 ## Quick start
 
 ```sh
-# 1. Build (devkitPro msys2 shell, from a path with NO SPACES in it)
-/c/devkitPro/msys2/usr/bin/bash.exe -lc 'cd /c/your/checkout && make'
-
-# 2. Install: one .3gx per plugin folder, named for your game's Title ID
-cp CTRComposer-BlankTemplate.3gx  <SD>/luma/plugins/<TitleID>/
+# Builds BOTH variants into releases/ and runs the same checks CI does.
+sh Tools/build.sh
 ```
+
+```
+releases/CTRComposer-BlankTemplate.3gx  ->  <SD>/luma/plugins/<TitleID>/
+releases/default.3gx                    ->  <SD>/luma/plugins/default.3gx
+```
+
+The script exists because the devkitPro toolchain **cannot build from a path containing a
+space**. It mirrors the sources to a space-free path (`C:\ctrc` by default, override with
+`MIRROR=`), builds there, and copies the artifacts back into `releases/` — so the mirror stays an
+implementation detail and everything about the project lives under the project.
+
+Plain `make` works too, if your checkout is already on a space-free path.
 
 Then launch the game with Luma's plugin loader enabled and press **SELECT**.
 
