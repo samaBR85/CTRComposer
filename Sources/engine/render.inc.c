@@ -187,6 +187,34 @@ static void BlitTopRect(const FbInfo *f, int x0, int y0, int w, int h)
             FbWritePx(f, x, y, CPix(x, y), TOP_H);
 }
 
+// Which buffer the top screen was showing when we took over. Present() flips this register to
+// show OUR frame; nothing else ever puts it back, so the plugin has to - see TopRelease().
+static u32 g_lcdSelSaved = 0;
+static int g_lcdSelValid = 0;
+
+// Call once when the overlay takes over the top screen, BEFORE the first Present().
+static void TopTakeOver(void)
+{
+    if (g_lcdSelValid) return;              // nested (quick menu -> menu): keep the outermost
+    g_lcdSelSaved = REG32(LCD_TOP + LCD_SELECT) & 1;
+    g_lcdSelValid = 1;
+}
+
+// Call when handing the screen back to the game, right before ResumeGame().
+//
+// WHY THIS EXISTS: the bottom screen draws straight into the visible buffer, so restoring its
+// pixels is enough. The top screen does NOT - Present() writes the hidden buffer and then flips
+// this register. Leave it flipped and the LCD keeps scanning out our composed frame: the game
+// runs on (the bottom screen comes back, audio plays) while the top stays frozen on the menu.
+// Putting the register back makes the LCD scan the game's own front buffer again, which still
+// holds its last real frame.
+static void TopRelease(void)
+{
+    if (!g_lcdSelValid) return;
+    REG32(LCD_TOP + LCD_SELECT) = g_lcdSelSaved;
+    g_lcdSelValid = 0;
+}
+
 static void Present(void)
 {
     u32 sel = REG32(LCD_TOP + LCD_SELECT) & 1;

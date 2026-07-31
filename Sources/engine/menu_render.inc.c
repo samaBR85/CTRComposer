@@ -374,6 +374,13 @@ static int g_quitToGame = 0;
 // SELECT jumps straight back into it (not the Tools folder). -1 = none.
 static int g_resumeTool = -1;
 
+// Set when RunMenu() is entered straight from the quick menu (a starred folder or tool was
+// picked). It means the game has NOT drawn a frame since we last painted the screen, so
+// GrabFb() would capture our own quick-menu panel and bake it into the backdrop - the menu
+// then renders on top of a photograph of itself, and every reopen layers another copy.
+// RunMenu reuses the clean backdrop the quick menu already captured instead.
+static int g_qmHandoff = 0;
+
 static void InfoBox(const Item *it)
 {
     const char *ibLabel = HkExpand(it->label, it->cheat);

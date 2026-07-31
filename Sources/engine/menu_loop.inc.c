@@ -213,12 +213,25 @@ static void RunMenu(void)
     g_quitToGame = 0; // fresh; a sub-loop sets this to request "exit to game"
 
     PauseGame();
+    TopTakeOver();   // remember which buffer the game was showing, so we can hand it back
 
     BotGrab();
     ComposeBottom();
     BotBlitComposeBoth();
 
-    GrabFb();
+    // Normally: read the live game frame and dim it. But when we were handed straight over from
+    // the quick menu, the visible framebuffer still holds the quick-menu panel - the game only
+    // resumed for the microseconds it took to get here and has drawn nothing since. Grabbing now
+    // would capture our own UI as "the game", so reuse the clean frame the quick menu saved.
+    if (g_qmHandoff)
+    {
+        g_qmHandoff = 0;
+        RestoreTopBackdrop();  // savedTop = the real game frame, captured before the panel drew
+    }
+    else
+    {
+        GrabFb();
+    }
     DimOutsideWindow();
     CaptureTopBackdrop(); // save clean backdrop so top redraws stay bleed-free
 
@@ -439,6 +452,7 @@ static void RunMenu(void)
     menuDepth = depth; menuFolder = folderIdx; menuCursor = cursor; menuScroll = scroll;
 
     BotRestoreBoth();
+    TopRelease();   // hand the top screen back too, else it stays frozen on our last frame
     DrainButtons(BUTTON_B | BUTTON_SELECT | BUTTON_A); // let go of B before the game sees it (else: sword swing)
     ResumeGame();
 

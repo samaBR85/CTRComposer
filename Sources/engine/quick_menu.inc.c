@@ -51,6 +51,7 @@ static void QuickMenu(void)
     SysFontInit();   // idempotent - ensures the system font is loaded even when the quick menu is
                      // the FIRST thing opened after boot (else info boxes fall back to the tiny font)
     PauseGame();
+    TopTakeOver();   // remember which buffer the game was showing, so we can hand it back
     GrabFb();
     CaptureTopBackdrop(); // save the game frame so we can repaint cleanly (e.g. after the X info box)
 
@@ -192,6 +193,10 @@ static void QuickMenu(void)
     qmLastCursor = cursor; // remember where we were, for the next open
     flashCheat = -1; flashTicks = 0;
     DrainButtons(BUTTON_B | BUTTON_SELECT | BUTTON_A);
+    // Only hand the screen back if we are really going to the game. When a starred folder or
+    // tool was picked, RunMenu() takes over immediately - releasing here would show one frame of
+    // game and then re-grab it, which is the flicker this hand-off exists to avoid.
+    if (g_openFolder < 0 && g_openTool < 0) TopRelease();
     ResumeGame();
     if (favDirty)  { FavSave(); favDirty = 0; }  // persist changes made from the quick menu too
 }

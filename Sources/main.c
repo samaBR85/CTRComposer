@@ -187,6 +187,7 @@ void ThreadMain(void *arg)
                 // Save the normal menu position and restore it afterwards, so this transient jump
                 // doesn't hijack where SELECT reopens (else SELECT would keep landing in this folder).
                 int sD = menuDepth, sF = menuFolder, sC = menuCursor, sS = menuScroll;
+                g_qmHandoff = 1;   // the quick menu is still on screen: don't re-grab it as backdrop
                 menuDepth = 0; menuFolder = fld; menuScroll = 0; menuCursor = 0;
                 { const Folder *nf = &folders[fld]; // land on the first selectable row
                   while (menuCursor < nf->count && IS_SEP(&nf->items[menuCursor])) menuCursor++;
@@ -200,7 +201,11 @@ void ThreadMain(void *arg)
                 int t = g_openTool; g_openTool = -1;
                 int sD = menuDepth, sF = menuFolder, sC = menuCursor, sS = menuScroll;
                 g_resumeTool = t;                    // RunMenu's resume path runs the tool with full setup
-                menuDepth = 0; menuFolder = 0; menuCursor = 0; menuScroll = 0; // land on HOME after the tool
+                g_qmHandoff = 1;   // the quick menu is still on screen: don't re-grab it as backdrop
+                menuDepth = 0; menuFolder = 0; menuScroll = 0; menuCursor = 0;
+                { const Folder *nf = &folders[F_ROOT]; // land on the first selectable row, not a separator
+                  while (menuCursor < nf->count && IS_SEP(&nf->items[menuCursor])) menuCursor++;
+                  if (menuCursor >= nf->count) menuCursor = 0; }
                 RunMenu();
                 menuDepth = sD; menuFolder = sF; menuCursor = sC; menuScroll = sS;
                 prev = HID_PAD;
