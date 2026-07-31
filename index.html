@@ -47,10 +47,8 @@
   .btn:hover{border-color:#4b515b;background:#1f2228}
   .btn.primary{background:var(--ink);color:#101114;border-color:var(--ink)}
   .btn.primary:hover{background:#fff;border-color:#fff}
-  /* "Coming soon" state: inert, so it reads as a status and not a dead link. */
-  .btn.soon{background:transparent;color:var(--dim);border-color:var(--line);
-            cursor:default;letter-spacing:.06em;text-transform:uppercase;font-size:14px}
-  .btn.soon:hover{background:transparent;border-color:var(--line);color:var(--dim)}
+  /* No "coming soon" state any more: releases are published, so the button is always live.
+     If that ever stops being true, make the MARKUP say so - do not rely on the script. */
   .meta{margin-top:14px;color:var(--dim);font-size:13.5px;font-family:var(--mono);min-height:1.4em}
   .meta b{color:var(--ok);font-weight:600}
 
@@ -105,12 +103,13 @@
       <span class="chip">any Title ID</span>
     </div>
     <div class="cta">
-      <!-- No href on purpose: there is nothing to download yet. The script at the bottom turns
-           this back into a real download link the moment a release exists. -->
-      <a class="btn primary soon" id="dl">Coming soon</a>
+      <!-- Static markup is the TRUE state: releases exist, so this is a real link even with no
+           JavaScript. The script at the bottom only enriches the line below with the live
+           version, size and download count - it is enhancement, never the source of truth. -->
+      <a class="btn primary" id="dl" href="https://github.com/samaBR85/CTRComposer/releases">Download the .3gx</a>
       <a class="btn" href="https://github.com/samaBR85/CTRComposer">Source on GitHub</a>
     </div>
-    <div class="meta" id="meta">No binary published yet — build it from source</div>
+    <div class="meta" id="meta">Both builds are attached to every tagged release</div>
     <img class="hero" src="screenshots/hero.png"
          alt="CTRComposer on a 3DS: the HOME menu on the top screen, the control legend on the bottom">
   </div>
@@ -149,6 +148,9 @@
            quick menu, a guide reader, a progress tracker, and the four memory tools.</p>
         <p>What you add is the part no engine can give you — <b>your game's addresses</b>.
            Everything else is already written.</p>
+        <p>And it is fenced off: everything you edit is eight files in
+           <code>Sources/plugin/</code>. The engine lives in <code>Sources/engine/</code> and you
+           never open it.</p>
         <p class="pick-w">Pick this if you want a cheat menu for a specific game, you're reviving
            an old <code>.plg</code> that no longer loads, or you want an overlay UI for a homebrew
            idea of your own.</p>
@@ -233,7 +235,7 @@
       <li><b>On-screen keypad</b> with touch, DEC/HEX toggle, and art fully separate from input handling.</li>
       <li><b>SD persistence</b> that migrates rather than discards, so a version bump doesn't reset everyone.</li>
       <li><b>Auto-repeat</b>, toasts, and <kbd>SELECT</kbd> to resume the game from anywhere.</li>
-      <li><b>No Title ID to hard-code</b> — the plugin finds its own folder from the loader at runtime.</li>
+      <li><b>Two folders, not one file</b> — everything you edit lives in <code>Sources/plugin/</code>; the engine sits in <code>Sources/engine/</code> and you never open it.</li>
     </ul>
   </div>
 </section>
@@ -267,9 +269,9 @@ make</code></pre>
 
 <script>
 (function () {
-  // Fills in the "latest version / size / downloads" line - and DOES NOTHING when there are no
-  // releases yet, leaving the static "build it from source" text in the markup alone. So the
-  // moment a release is published this lights up on its own, with no edit here.
+  // Enriches the meta line with the live version / size / download count. The markup already
+  // states the true, release-exists state, so this is pure enhancement: on a rate-limited API,
+  // a network failure, or no JS at all, the page still shows a working download link.
   var API = 'https://api.github.com/repos/samaBR85/CTRComposer/releases';
   var meta = document.getElementById('meta');
 
@@ -292,14 +294,6 @@ make</code></pre>
 
       var latest = rels.find(function (r) { return !r.draft && !r.prerelease; }) || rels[0];
       var asset = (latest.assets || []).find(function (a) { return /\.3gx$/.test(a.name); });
-
-      // A release exists again - turn "Coming soon" back into a real download button.
-      var dl = document.getElementById('dl');
-      if (dl) {
-        dl.href = 'https://github.com/samaBR85/CTRComposer/releases';
-        dl.textContent = 'Download the .3gx';
-        dl.classList.remove('soon');
-      }
 
       var when = new Date(latest.published_at).toLocaleDateString('en-US',
                    { year: 'numeric', month: 'short', day: 'numeric' });
