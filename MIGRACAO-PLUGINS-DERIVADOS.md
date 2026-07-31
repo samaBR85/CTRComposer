@@ -63,6 +63,11 @@ template não possui — teleporte, pickers com arte de item, temas próprios.
 O que você copia do CTRComposer: **exatamente dois arquivos de ferramenta** (`Tools/fingerprint.sh`
 e uma linha do `Makefile`), listados na Etapa 0. Mais nada.
 
+> **A única exceção**, no fim deste guia: uma correção de bug de ~20 linhas para um travamento de
+> tela que o seu fork também tem. Ela vem com o diagnóstico completo justamente para você
+> **confirmar que se aplica ao seu código** antes de mexer — não é "troque pelo nosso", é "aqui
+> está o que estava errado e por quê". E é para fazer **depois** da migração, nunca junto.
+
 ---
 
 ## Por que isto é seguro (e como provar)
@@ -374,11 +379,112 @@ Ao terminar, confira:
 - [ ] Nenhum `.inc.c` solto em `sources/` (todos em `plugin/` ou `engine/`)
 - [ ] O balanço de `#if`/`#endif` fecha em cada arquivo
 - [ ] **Testado no console de verdade** — abrir o menu, um cheat, uma tool, o guia, o tracker
+- [ ] Só então, a correção de bug da seção seguinte — que **muda** o binário, de propósito
 
 > O último item não é opcional. A verificação byte a byte prova que o *compilador* gerou o mesmo
 > código; ela não prova que você não esqueceu um arquivo fora do `#include`. Se um arquivo ficar
 > órfão, o build quebra — mas se você duplicar um `#include`, pode compilar e se comportar
 > diferente. Uma passada de 2 minutos no hardware fecha a conta.
+
+---
+
+## Depois da migração: um bug real que o seu fork também tem 🔴
+
+**Isto NÃO faz parte da reorganização. Faça só depois de terminar o checklist acima.**
+
+Motivo da ordem: tudo até aqui é provado por `cmp` byte a byte. Esta correção **muda o binário de
+propósito** — é o objetivo dela. Se você misturar as duas coisas, perde o oráculo e não saberá
+mais se a reorganização mexeu em algo que não devia.
+
+### O sintoma
+
+Você sai do plugin e a **tela de cima fica congelada** na última imagem dele. A tela de baixo
+volta para o jogo normalmente, o jogo continua rodando, o áudio toca — só o topo fica parado.
+Reabrir o menu desenha um novo por cima da imagem travada, indefinidamente.
+
+Para reproduzir: estrele uma **ferramenta** (Cheat Search / RAM Dumper / Hex Editor) como
+favorita, abra o quick menu, lance a ferramenta por ali e saia. **Só o atalho de ferramenta
+dispara** — o de cheat não passa por `RunMenu()`. É por isso que o bug pode estar anos no seu
+plugin sem nunca aparecer: se os seus favoritos são cheats, você nunca andou por esse caminho.
+
+### A causa
+
+`Present()` desenha no buffer escondido e depois troca qual dos dois o LCD exibe:
+
+```c
+REG32(LCD_TOP + LCD_SELECT) = sel ^ 1;
+```
+
+**Nada nunca devolve esse registrador.** Ao sair, o LCD segue varrendo o buffer do *plugin*.
+
+E é exatamente por isso que só a tela de cima quebra: a de baixo escreve direto no buffer
+visível, então restaurar os pixels (`BotRestoreBoth()`) basta. Só a de cima troca o registrador.
+
+Confirme que se aplica ao seu fork — deve haver **uma** escrita em `LCD_TOP + LCD_SELECT`, dentro
+de `Present()`, e nenhuma restauração:
+
+```sh
+grep -n "LCD_SELECT" sources/main.c    # ou sources/engine/render.inc.c, se já migrou
+```
+
+### A correção
+
+Junto de `Present()`:
+
+```c
+// Qual buffer a tela de cima exibia quando assumimos. Present() troca esse registrador para
+// mostrar o NOSSO frame; ninguem mais o devolve, entao o plugin tem que devolver.
+static u32 g_lcdSelSaved = 0;
+static int g_lcdSelValid = 0;
+
+static void TopTakeOver(void)
+{
+    if (g_lcdSelValid) return;   // aninhado (quick menu -> menu): mantem o mais externo
+    g_lcdSelSaved = REG32(LCD_TOP + LCD_SELECT) & 1;
+    g_lcdSelValid = 1;
+}
+
+static void TopRelease(void)
+{
+    if (!g_lcdSelValid) return;
+    REG32(LCD_TOP + LCD_SELECT) = g_lcdSelSaved;
+    g_lcdSelValid = 0;
+}
+```
+
+Depois:
+
+- `TopTakeOver()` logo após o `PauseGame()` — no `RunMenu()` **e** no `QuickMenu()`
+- `TopRelease()` logo antes do `ResumeGame()` no `RunMenu()`
+- No `QuickMenu()`, `TopRelease()` **só se nenhum atalho foi escolhido**:
+  ```c
+  if (g_openFolder < 0 && g_openTool < 0) TopRelease();
+  ```
+  Senão o `RunMenu()` assume logo em seguida, e devolver ali mostraria um frame do jogo só para
+  recapturá-lo — o piscar que o hand-off existe para evitar.
+
+### Dois defeitos vizinhos, no mesmo caminho
+
+**O quick menu vira o fundo do menu.** Vindo do quick menu, o `RunMenu()` chama `GrabFb()`
+microssegundos depois do `ResumeGame()`. O jogo não desenhou nada nesse intervalo, então ele
+captura o **próprio quick menu** como se fosse o frame do jogo e o grava como fundo — o menu passa
+a ser desenhado sobre uma fotografia de si mesmo. Corrija com uma flag setada onde o quick menu
+entrega o controle, e no `RunMenu()` use `RestoreTopBackdrop()` em vez de `GrabFb()` quando ela
+estiver ligada (o quick menu já salvou um frame limpo antes de desenhar).
+
+**Cursor num separador.** O atalho de *ferramenta* do quick menu deixa o cursor na linha 0 do
+HOME, que pode ser um cabeçalho não-selecionável. O atalho de *pasta*, logo acima no mesmo bloco,
+já pula separadores com um `while (IS_SEP(...)) menuCursor++`. Replique no de ferramenta.
+
+### Como verificar
+
+Aqui **o `cmp` tem que falhar** — você mudou código de propósito. A verificação é o console:
+estrele uma ferramenta, lance pelo quick menu, saia, e confirme que a tela de cima volta a mostrar
+o jogo.
+
+> Referência: `CTRComposer`, commit `c6ee3fe`. Diagnosticado a partir de um relato de hardware,
+> corrigido e confirmado no console. Os três defeitos existem desde a primeira versão do motor —
+> não são consequência da reorganização.
 
 ---
 
