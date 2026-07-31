@@ -22,7 +22,8 @@ already written.
 > Installs to `luma/plugins/<TitleID>/` — one `.3gx` per game folder.
 >
 > Ships with **zero game art and zero game addresses**. The example cheats are inert placeholders
-> that write nothing until you set `EXAMPLE_ENABLED` in [`Sources/main.c`](Sources/main.c).
+> that write nothing until you set `EXAMPLE_ENABLED` in
+> [`Sources/plugin/cheats.inc.c`](Sources/plugin/cheats.inc.c).
 
 **Pick this if:** you want a cheat menu for a specific game · you're reviving an old `.plg`
 that no longer loads · you want an overlay UI for a homebrew idea of your own.
@@ -51,9 +52,10 @@ built one, and the toolkit covers everything else.
 The natural workflow is exactly that order — hunt addresses anywhere with `default.3gx`, then
 build the real plugin from the template once you have them.
 
-<sub>Under the hood the second build is just `TOOLS_ONLY` set to `1` in `Sources/main.c`. The
-per-game furniture — example cheats, tracker, game guide — is compiled out along with every menu
-string that referenced it, which is checked by CI.</sub>
+<sub>Under the hood the second build is just `TOOLS_ONLY` set to `1` in
+[`Sources/plugin/identity.inc.c`](Sources/plugin/identity.inc.c). The per-game furniture — example
+cheats, tracker, game guide — is compiled out along with every menu string that referenced it,
+which is checked by CI.</sub>
 
 **[Project page](https://samabr85.github.io/CTRComposer/)**
 
@@ -89,7 +91,8 @@ cp CTRComposer-BlankTemplate.3gx  <SD>/luma/plugins/<TitleID>/
 Then launch the game with Luma's plugin loader enabled and press **SELECT**.
 
 The plugin **loads** under any Title ID — `Targets:` is empty in the `.plgInfo`. Where it
-**stores** its data is one `#define` in [`Sources/main.c`](Sources/main.c):
+**stores** its data is one `#define` in
+[`Sources/plugin/identity.inc.c`](Sources/plugin/identity.inc.c):
 
 ```c
 #define PLUGIN_DIR "/luma/plugins/0004000000033500/"   // your game's folder
@@ -101,16 +104,54 @@ game — set it before you ship.
 
 ## What's in the box
 
+The source is split so that **everything you edit is in one folder** and the engine is in
+another. `main.c` is 250 lines: the `#include` list, in build order, plus the entry point.
+
+```
+Sources/
+  main.c        the table of contents — you rarely touch it
+  plugin/       ← YOU EDIT HERE
+  engine/       the engine — you inherit it as-is
+```
+
+### `Sources/plugin/` — your half
+
+| File | What you put in it |
+|---|---|
+| [`identity.inc.c`](Sources/plugin/identity.inc.c) | Plugin name, version, `TOOLS_ONLY`, and `PLUGIN_DIR` (your game's folder). |
+| [`cheat_ids.inc.c`](Sources/plugin/cheat_ids.inc.c) | One `CH_*` per cheat. Sizes the state arrays, so it is included early. |
+| [`cheats.inc.c`](Sources/plugin/cheats.inc.c) | The addresses. `ApplyCheats()` runs every frame; `OneShot()` fires on A. |
+| [`pickers.inc.c`](Sources/plugin/pickers.inc.c) | Rows that pick a value from a list and write it to an address. |
+| [`menu_tables.inc.c`](Sources/plugin/menu_tables.inc.c) | The folders and rows. Pure data — the renderer draws whatever is here. |
+| [`cheat_icons.inc.c`](Sources/plugin/cheat_icons.inc.c) | Which icon illustrates each cheat row. |
+| [`tracker_data.inc.c`](Sources/plugin/tracker_data.inc.c) | The progress-tracker items, or delete the Tracker row and ignore it. |
+| [`guide_text.inc.c`](Sources/plugin/guide_text.inc.c) | The Plugin Guide pages and the guide credits page. |
+
+### `Sources/engine/` — the half you inherit
+
+23 files, none of which a new plugin needs to open: `render`, `theme`, `sprites`, `icons`,
+`menu_model`, `menu_nav`, `menu_render`, `menu_loop`, `quick_menu`, `bottom_screen`, `toast`,
+`tools`, `guide_reader`, `guide_game`, `guide_plugin`, `tracker`, `tracker_ui`, `storage`,
+`favorites`, `input`, `platform`, `tool_dispatch`, `guide_text_tools`.
+
+> They are `.inc.c` files pulled in by `#include`, not separate compilation units — the whole
+> program stays one translation unit, so `static` stays `static` and the compiler emits exactly
+> the same code as the old single file. That is why the split was provably byte-for-byte
+> identical. **Keep them in a subfolder:** the `Makefile` compiles `Sources/*.c`, so an `.inc.c`
+> sitting loose in `Sources/` would be compiled a second time and break the link.
+
+### Everything else
+
 | Path | What it is |
 |---|---|
-| `Sources/main.c` | The whole engine. The only game-specific part is the clearly-marked cheat section. |
 | `Sources/sysfont.c` | 3DS shared-font renderer (APT IPC, no `aptInit`). |
 | `Sources/bootloader.s`, `csvc.s` | Entry stub and the `svcControlProcess` wrapper. |
 | `Includes/glyphs.h` | Button glyphs — **generated**, see `Assets/gen_glyphs.py`. |
 | `Includes/themes.h` | Theme table. Ships one neutral monochrome theme. |
-| `Includes/guide.h` | Embedded guide pages (generic placeholders). |
+| `Includes/guide.h` | Embedded **Game Guide** pages (generic placeholders). |
+| `Tools/fingerprint.sh` | Proves a refactor didn't change the binary (name + size of every symbol). |
 | `Assets/gen_glyphs.py` | Redraws the button-glyph sheet from primitives. |
-| `.github/workflows/build.yml` | CI: builds the `.3gx` on every push and uploads it as a run artifact. |
+| `.github/workflows/build.yml` | CI: builds both `.3gx` variants on every push. |
 
 ---
 
@@ -243,6 +284,10 @@ D-pad so holding a direction keeps the cursor moving; leave action buttons on pl
 ---
 
 ## 3 · Applying cheats  ← *the only game-specific part*
+
+> Lives in [`Sources/plugin/cheats.inc.c`](Sources/plugin/cheats.inc.c), with the `CH_*` ids in
+> [`cheat_ids.inc.c`](Sources/plugin/cheat_ids.inc.c) and the menu rows in
+> [`menu_tables.inc.c`](Sources/plugin/menu_tables.inc.c).
 
 The plugin shares the game's address space, so writing memory is a pointer. Only the addresses
 change between games.
@@ -431,7 +476,21 @@ a stable string, so adding or reordering items never invalidates saved entries.
 
 ## 7 · The reusable engine modules
 
-Everything below is **game-independent** — copy and reuse.
+Everything below is **game-independent** — copy and reuse. Each lives in its own file under
+`Sources/engine/`, named after what it does:
+
+| Concern | File |
+|---|---|
+| Menu model (`Item` / `Folder`, the `IT_*` macros) | `menu_model.inc.c` |
+| Menu drawing, cursor, scrolling | `menu_render.inc.c` |
+| The menu loop and freezing the game | `menu_loop.inc.c` |
+| Themes, colours, auto-contrast | `theme.inc.c` |
+| Compose buffer, text, framebuffer blit | `render.inc.c` |
+| Sprite blit and code-drawn icons | `sprites.inc.c`, `icons.inc.c` |
+| Cheat Search, RAM Dumper, Hex Editor | `tools.inc.c` |
+| Guide reader | `guide_reader.inc.c` |
+| Config, favourites, localization, SD guides | `storage.inc.c`, `favorites.inc.c` |
+| Quick menu (L+SELECT favourites) | `quick_menu.inc.c` |
 
 **Menu model.** `Item { label, cheat, folder, picker, desc, tool }` + `Folder { title, items,
 count }`. Macros: `IT_CHEAT / IT_FOLDER / IT_PICKER / IT_TOOL / IT_SEP` (non-selectable section
@@ -533,11 +592,12 @@ and the live glyph shows in the cheat's info via an inline button token (section
    region numbers are easy to mix up). Install under `luma/plugins/<TitleID>/`.
 2. **Cheat table** (section 3): an existing source or Cheat Search. **Region-specific.**
 3. **Player base pointer** for base+offset cheats.
-4. **Reuse the whole engine** (section 7) — none of it depends on the game.
-5. **Change only:** the cheat table, sprites/art, and the Title ID in the config path. Everything
-   else — menu layout, theme(s), whether to include a Game Guide, which (if any) languages beyond
-   English, how many tools to expose — is a choice, not a requirement; add only what the plugin
-   needs.
+4. **Reuse the whole engine** (section 7) — none of it depends on the game, and it is already
+   fenced off in `Sources/engine/`.
+5. **Change only what is in `Sources/plugin/`:** the cheat table, the menu rows, your art and the
+   Title ID. Everything else — menu layout, theme(s), whether to include a Game Guide, which (if
+   any) languages beyond English, how many tools to expose — is a choice, not a requirement; add
+   only what the plugin needs.
 6. **Iterate on hardware.** Put the version on screen and bump it every build.
 
 ---
@@ -569,10 +629,15 @@ cp <project>/plugin.3gx  <SD>/luma/plugins/<TitleID>/<Name>.3gx
 Work down this list and you have your own plugin. Everything not listed is engine you inherit
 as-is.
 
+> Everything in steps 1–8 lives in [`Sources/plugin/`](Sources/plugin). If a step sends you into
+> `Sources/engine/`, it is optional polish, not required work.
+
 **1. Name it.**
 - `Makefile` → `TARGET` (the output `.3gx` filename) and `PLGINFO`.
 - Rename `CTRComposer.plgInfo` to match `PLGINFO`; set `Author`, `Title`, `Summary`.
-- `Sources/main.c` → `PLUGIN_NAME`, `PLUGIN_VER`, `PLUGIN_TAG`.
+- `Sources/plugin/identity.inc.c` → `PLUGIN_NAME` and the version. The version is three numbers
+  (`PLUGIN_VER_MAJOR/MINOR/PATCH`); the on-screen strings `PLUGIN_VER` and `PLUGIN_TAG` are built
+  from them, so you bump one place, not two.
 
 **2. Find your Title ID** (section 8). Install under `luma/plugins/<TitleID>/`. Optionally add
 it to `Targets:` in the `.plgInfo` so the plugin only loads for that game. You do *not* need to
@@ -581,14 +646,17 @@ put it in the source — the plugin discovers its own folder at runtime.
 **3. Write your cheat table** — the one genuinely game-specific job (section 3).
 - Get addresses from an existing source (a `.plg`, an AR code bank, a community plugin) or find
   them with the built-in **Cheat Search**. They are **region- and version-specific**.
-- In `Sources/main.c`: add `CH_*` entries to the cheat enum, rows to a `Folder`, and the writes
-  to `ApplyCheats()` (continuous) or `OneShot()` (applied once).
-- Set `EXAMPLE_ENABLED` to `1` only after you have replaced the placeholder addresses, and
-  delete the `CH_EX_*` examples once you no longer need them.
-- Update `IsToggleCheat()` so on/off cheats get a checkbox and one-shots get a plain box.
+- Add `CH_*` entries to the enum in `plugin/cheat_ids.inc.c`, the writes to `ApplyCheats()`
+  (continuous) or `OneShot()` (applied once) in `plugin/cheats.inc.c`, and the rows to a `Folder`
+  in `plugin/menu_tables.inc.c`.
+- Set `EXAMPLE_ENABLED` (in `plugin/cheats.inc.c`) to `1` only after you have replaced the
+  placeholder addresses, and delete the `CH_EX_*` examples once you no longer need them.
+- Update `IsToggleCheat()` — same file, right below `ApplyCheats()` — so on/off cheats get a
+  checkbox and one-shots get a plain box.
 
-**4. Lay out your menu.** `folders[]` and the `Item` rows are pure data. HOME is a 2-column grid
-and everything else is a list — that is a choice made in one line of `ComposeMenu()`, not a rule.
+**4. Lay out your menu.** In `plugin/menu_tables.inc.c`: `folders[]` and the `Item` rows are pure
+data. HOME is a 2-column grid and everything else is a list — that is a choice made in one line of
+`ComposeMenu()` (`engine/menu_render.inc.c`), not a rule.
 
 **5. Theme it.** Add rows to `THEMES[]` in `Includes/themes.h`, or ship the single neutral one.
 Auto-contrast keeps text readable on light and dark backgrounds without per-theme tweaking.
@@ -598,16 +666,24 @@ code-drawn keypad, no logo. To add real art, embed it as RGBA4444 and blit with 
 `DrawScaled()` — and **pack with round-to-nearest**, `clamp((c + 8) / 17, 0, 15)`, or your art
 comes out visibly brighter than the source. `Assets/gen_glyphs.py` is a worked example.
 
-**7. Guides and languages (optional).** Replace the placeholder pages in `Includes/guide.h`, or
-drop `guide/English/game.txt` on the SD card and skip C entirely. Translations are
-`lang/<Name>.txt` files keyed by the English string; missing entries fall back to English.
+**7. Guides and languages (optional).** There are two separate guides:
+- The **Plugin Guide** explains *your plugin* — its pages live in `plugin/guide_text.inc.c`,
+  along with the guide credits page.
+- The **Game Guide** carries *your game's* walkthrough — placeholder pages in `Includes/guide.h`.
 
-**8. Tracker (optional).** Fill `CHK_CATS` with your collectibles and give each a detection kind
-(`CK_BIT` / `CK_BYTEEQ` / `CK_NONZERO`), or leave it as-is, or delete the row from `rootItems[]`.
+Either can be replaced at runtime instead of in C: drop
+`<plugin dir>/guide/English/{plugin,game}.txt` on the SD card and it overrides the embedded
+pages. Translations are `lang/<Name>.txt` files keyed by the English string; missing entries
+fall back to English.
 
-**9. Iterate on hardware.** Bump `PLUGIN_VER` **every** build and check it on screen — it is
-your proof that the `.3gx` on the SD card is the one you just compiled. Verify the bump actually
-landed; a blind `sed` can silently no-op and freeze the on-screen version.
+**8. Tracker (optional).** Fill `CHK_CATS` in `plugin/tracker_data.inc.c` with your collectibles
+and give each a detection kind (`CK_BIT` / `CK_BYTEEQ` / `CK_NONZERO`), or leave it as-is, or
+delete the Tracker row from `rootItems[]` in `plugin/menu_tables.inc.c`.
+
+**9. Iterate on hardware.** Bump the version in `plugin/identity.inc.c` **every** build and check
+it on screen — it is your proof that the `.3gx` on the SD card is the one you just compiled.
+Verify the bump actually landed; a blind `sed` can silently no-op and freeze the on-screen
+version.
 
 ### Build gotchas worth re-reading
 
