@@ -294,10 +294,17 @@ when you want to change the engine, or port the technique somewhere else.
   you embed a large guide or snapshots). Build rule: `3gxtool -s $(elf) $(plgInfo) $@`. Flag `-D__3DS__`.
 
 > **Gotcha — spaces in paths** — The devkitPro toolchain breaks on paths containing spaces
-> (`make[1]: /d/My Project: Is a directory`). Build from a **space-free path**, and run make
-> through the **devkitPro msys2 shell**, not git-bash:
-> `/c/devkitPro/msys2/usr/bin/bash.exe -lc 'cd <project> && make'`. Also keep **one `.3gx` per
-> plugin folder**.
+> (`make[1]: /d/My Project: Is a directory`), so the checkout must sit on a space-free path — or
+> you use `sh Tools/build.sh`, which mirrors to one, builds there, and copies the artifacts back
+> into `releases/`.
+>
+> Two related traps if you invoke `make` yourself from git-bash: `$DEVKITARM` may already be set
+> to a Linux-style path that does not exist on Windows, and the devkitPro `make.exe` reports its
+> own location in the msys2 view (`/opt/devkitpro/...`), which only resolves inside the devkitPro
+> msys2 shell — so the recursive `$(MAKE)` fails. Passing `DEVKITARM`, `DEVKITPRO` and `PATH` as
+> **make command-line variables** works from any shell. `Tools/build.sh` does exactly that.
+>
+> Also keep **one `.3gx` per plugin folder**.
 
 Luma injects a `PluginHeader` at `0x07000000`. The skeleton sets up the heap and starts a
 worker thread:
