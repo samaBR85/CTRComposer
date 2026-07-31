@@ -38,8 +38,7 @@ static void GuideWrap(const char *s, int cols)
 }
 
 // static branded bottom panel while a guide is open
-// Bottom-screen header for BOTH readers. The title used to be hardcoded to "Game Guide",
-// which meant the Plugin Guide announced itself as the Game Guide - take it as a parameter.
+// Shared by both readers - title is a parameter so each shows its own name, not the other's.
 static void GuideBottom(const char *title, const char *subtitle)
 {
     for (int yy = 0; yy < BOT_H; ++yy)

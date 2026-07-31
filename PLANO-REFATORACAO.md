@@ -290,14 +290,26 @@ Desproporcional para resolver 19 linhas espalhadas. **Recomendação: não fazer
 
 ---
 
-## Etapa 6 — Limpezas cosméticas 🟢
+## Etapa 6 — Limpezas cosméticas 🟢 ✅ *(feita)*
 
 **Modelo sugerido: Sonnet.** **Risco: baixo.**
 
-- `PLUGIN_TAG` duplicado (`"1.0"` / `"T1.0"`) mantido à mão em dois lugares — já causou
-  divergência entre CI e build local uma vez.
-- Comentários que descrevem decisões já revertidas (vai ser em boa parte resolvido na Etapa 2).
-- `main.c` guardando coisas que não são "main" (resolvido pelas Etapas 3–4).
+- **`PLUGIN_TAG` duplicado** — corrigido. `identity.inc.c` agora define `PLUGIN_VER_MAJOR/MINOR/
+  PATCH` como a única fonte da versão; `PLUGIN_VER` ("v1.0.1") e `PLUGIN_TAG` ("1.0"/"T1.0", sem
+  o dígito de patch por falta de espaço na barra de título) são montados a partir desses três
+  números via macro de stringize (`#x`), não mais digitados separadamente. Bump de versão agora é
+  editar 1 lugar, não 2 — a divergência que já aconteceu entre CI e build local fica estruturalmente
+  impossível, não só lembrada num comentário.
+- **Comentário de narrativa histórica residual** — achado 1: `guide_reader.inc.c` ainda tinha
+  *"The title used to be hardcoded to 'Game Guide', which meant..."*, sobre um bug corrigido
+  depois que a Etapa 2 já tinha rodado. Cortado para só a restrição real (`GuideBottom` recebe o
+  título porque é compartilhado pelos dois leitores). Busca ampla por outros padrões similares
+  (`was hardcoded`, `used to be`, `had a bug`, `regression`...) não achou mais nenhum.
+- **`main.c` guardando coisas que não são "main"** — já resolvido pelas Etapas 3–4; confirmado
+  que `main.c` tem 250 linhas e contém só includes + `ThreadMain`/`main()`. Nada a fazer aqui.
+
+Verificado byte a byte idêntico nas duas variantes (a mudança de comentário e a troca de string
+literal por concatenação em tempo de compilação não alteram o binário).
 
 ---
 

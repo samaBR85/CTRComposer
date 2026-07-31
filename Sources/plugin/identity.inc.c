@@ -18,16 +18,25 @@
 #define EXIT_HANDSHAKE 0
 
 // Bump EVERY build - the on-screen tag is your proof that the .3gx on the SD card is the one you
-// just compiled. Edit it for real and check it on screen; a blind sed can no-op silently.
-#define PLUGIN_VER "v1.0.1"           // About screen and pause box
+// just compiled. Edit the three numbers for real and check the result on screen; a blind sed can
+// no-op silently. PLUGIN_TAG below is derived from these, not typed again - a stray hand-edit of
+// just one of the two used to slip past the CI, which sedded TOOLS_ONLY/PLUGIN_NAME only.
+#define PLUGIN_VER_MAJOR 1
+#define PLUGIN_VER_MINOR 0
+#define PLUGIN_VER_PATCH 1
+
+#define PLUGIN_STR2(x) #x
+#define PLUGIN_STR(x) PLUGIN_STR2(x)
+#define PLUGIN_VER "v" PLUGIN_STR(PLUGIN_VER_MAJOR) "." PLUGIN_STR(PLUGIN_VER_MINOR) "." PLUGIN_STR(PLUGIN_VER_PATCH) // About screen and pause box
+#define PLUGIN_VER_SHORT PLUGIN_STR(PLUGIN_VER_MAJOR) "." PLUGIN_STR(PLUGIN_VER_MINOR) // tag has no room for the patch digit
 
 // Name and tag follow TOOLS_ONLY, so flipping that flag is the only edit the other build needs.
 #if TOOLS_ONLY
 #define PLUGIN_NAME "CTRComposer Tools"
-#define PLUGIN_TAG  "T1.0"              // compact tag - cramped menu title bar
+#define PLUGIN_TAG  "T" PLUGIN_VER_SHORT   // compact tag - cramped menu title bar
 #else
 #define PLUGIN_NAME "CTRComposer"
-#define PLUGIN_TAG  "1.0"
+#define PLUGIN_TAG  PLUGIN_VER_SHORT
 #endif
 
 // ===================== Where this plugin keeps its files =====================
