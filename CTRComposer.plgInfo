@@ -7,7 +7,7 @@ Version: # Plugin version - bump this every release.
     # that still has to be edited twice.
     Major: 1
     Minor: 1
-    Revision: 0
+    Revision: 2
 
 # Low TitleIds of the games this plugin is compatible with, one per line, e.g.
 #   Targets:
