@@ -83,7 +83,9 @@ static const GuidePage PLUGIN_PAGES[] = {
       "crashing. Unreadable bytes show as --." },
     { "Tips",
       "- SELECT is always 'back to the game', from any screen.\n"
-      "- Reopening the menu returns you to where you were, even inside a tool.\n"
+      "- SELECT out of a tool and the next SELECT drops you back INTO that tool, right\n"
+      "  where you left off - that is what makes the Cheat Search loop work. To leave a\n"
+      "  tool for good, press B first: that returns you to the menu.\n"
       "- Code-patch cheats are never auto-enabled on boot, by design.\n"
       "- Toast notifications can be turned off in Settings." },
 };
