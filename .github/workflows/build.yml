@@ -55,17 +55,22 @@ jobs:
 
       # Second artifact from the same tree: the universal build, for Luma's default.3gx slot.
       # Only the TOOLS_ONLY switch and the on-screen name differ - sed them, rebuild, restore.
+      #
+      # The flag lives in Sources/plugin/identity.inc.c, NOT in main.c: the plugin-editable
+      # surface was split out of main.c, which is now just the #include list. If this path ever
+      # goes stale again the grep below catches it - keep that guard.
       - name: Build the tools-only variant (default.3gx)
         run: |
           set -eux
-          cp Sources/main.c /tmp/main.c.orig
+          IDENTITY=Sources/plugin/identity.inc.c
+          cp "$IDENTITY" /tmp/identity.orig
           # ONE edit: PLUGIN_NAME and PLUGIN_TAG follow TOOLS_ONLY in the source.
-          sed -i 's/^#define TOOLS_ONLY 0$/#define TOOLS_ONLY 1/' Sources/main.c
-          grep -q '^#define TOOLS_ONLY 1' Sources/main.c   # fail loudly if the sed missed
+          sed -i 's/^#define TOOLS_ONLY 0$/#define TOOLS_ONLY 1/' "$IDENTITY"
+          grep -q '^#define TOOLS_ONLY 1' "$IDENTITY"   # fail loudly if the sed missed
           make clean
           make
           mv CTRComposer-BlankTemplate.3gx default.3gx
-          cp /tmp/main.c.orig Sources/main.c
+          cp /tmp/identity.orig "$IDENTITY"
           make clean
           make
 
