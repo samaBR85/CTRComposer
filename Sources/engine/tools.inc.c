@@ -452,7 +452,7 @@ static void SearchDrawResults(int scroll, int cursor)
     ComposeBackdrop();
     CText(WIN_X + 12, WIN_Y + 6, T("Cheat Search"), GOLD, 1);
     char hit[48];
-    if (!g_searchStarted) siprintf(hit, "%s", T("no search"));
+    if (!g_searchStarted) sniprintf(hit, sizeof hit, "%s", T("no search"));
     else if (g_unknownArmed) siprintf(hit, "Snapshot %luKB%s", (unsigned long)(g_snapUsed / 1024), g_capped ? "+" : "");
     else siprintf(hit, "Step %d   Hits: %lu%s", g_step, (unsigned long)g_candCount, g_capped ? "+" : "");
     CText6(WIN_X + WIN_W - 12 - C6Width(hit), WIN_Y + 9, hit, g_capped ? 233 : 196, g_capped ? 115 : 180, g_capped ? 107 : 150);
@@ -560,11 +560,11 @@ static void SearchDrawForm(void)
     int dimValue = (!ScanNeedsValue(g_scanType)) || (g_searchType == 1 && !g_searchStarted);
     int dims[5] = { locked, locked, locked, 0, dimValue };
     char val[5][40];
-    siprintf(val[0], "%s", T(REGION_NAME[g_memRegion]));
-    siprintf(val[1], "%s", T(SEARCHTYPE_NAME[g_searchType]));
+    sniprintf(val[0], sizeof val[0], "%s", T(REGION_NAME[g_memRegion]));
+    sniprintf(val[1], sizeof val[1], "%s", T(SEARCHTYPE_NAME[g_searchType]));
     siprintf(val[2], "%d Bytes  (%d-bit)", g_searchWidth, g_searchWidth * 8);
-    siprintf(val[3], "%s", T(SCAN_NAME[g_scanType]));
-    if (g_searchType == 1 && !g_searchStarted) siprintf(val[4], "%s", T("(not needed)"));
+    sniprintf(val[3], sizeof val[3], "%s", T(SCAN_NAME[g_scanType]));
+    if (g_searchType == 1 && !g_searchStarted) sniprintf(val[4], sizeof val[4], "%s", T("(not needed)"));
     else if (dimValue)                         siprintf(val[4], "--");
     else siprintf(val[4], "%lu  (0x%lX)", (unsigned long)g_searchValue, (unsigned long)g_searchValue);
 
@@ -798,7 +798,10 @@ static void ToolAbout(void)
                 for (int a = 0; a < 4; ++a) CFill(WIN_X + WIN_W - 16 - a, top + 3 + a, 1 + 2*a, 1, GOLD);
             if (scroll + vis < N)                    // down arrow (more below)
                 for (int a = 0; a < 4; ++a) CFill(WIN_X + WIN_W - 16 - a, footY - 6 - a, 1 + 2*a, 1, GOLD);
-            CText6Btn(x, footY, "{D-Pad} scroll    {B} back", INK_DIM);
+            // Token is {DP}, not {D-Pad}: GlyphTok() matches a 4-char form, so any other spelling
+            // silently draws as literal text. And T(), like every other footer - this one was the
+            // only string in the plugin a translator could not reach.
+            CText6Btn(x, footY, T("{DP} scroll    {B} back"), INK_DIM);
             Present(); Present();
             redraw = 0;
         }
@@ -809,7 +812,7 @@ static void ToolAbout(void)
         if (down & BUTTON_SELECT) { g_quitToGame = 1; break; }
         if (down & (BUTTON_B | BUTTON_A)) break;
     }
-    while (HID_PAD) svcSleepThread(10 * 1000 * 1000);
+    DrainButtons(~0u);   // capped: a bare wait here would hang the console on a stuck pad
 }
 
 // ---- RAM Dumper ----
@@ -845,9 +848,9 @@ static void RamDumpDrawTop(const char *status, u8 sr, u8 sg, u8 sb, int pct)
     CFill(WIN_X + 12, WIN_Y + 22, WIN_W - 24, 1, GOLD);
     u32 size = DUMP_SIZES[g_dumpSizeIdx];
     int x = WIN_X + 16, y = WIN_Y + 30; char l[72];
-    siprintf(l, "%s  0x%08lX", T("Start:"), (unsigned long)g_dumpStart);          CText6(x, y, l, INK); y += 15;
-    siprintf(l, "%s  0x%08lX", T("End:"), (unsigned long)(g_dumpStart + size)); CText6(x, y, l, INK); y += 15;
-    siprintf(l, "%s  %s", T("Size:"), DUMP_SIZE_NM[g_dumpSizeIdx]);              CText6(x, y, l, INK); y += 19;
+    sniprintf(l, sizeof l, "%s  0x%08lX", T("Start:"), (unsigned long)g_dumpStart);          CText6(x, y, l, INK); y += 15;
+    sniprintf(l, sizeof l, "%s  0x%08lX", T("End:"), (unsigned long)(g_dumpStart + size)); CText6(x, y, l, INK); y += 15;
+    sniprintf(l, sizeof l, "%s  %s", T("Size:"), DUMP_SIZE_NM[g_dumpSizeIdx]);              CText6(x, y, l, INK); y += 19;
     CText6(x, y, T("Saves to:"), INK_DIM); y += 13;
     CText6(x, y, PlgPath(DUMP_LEAF "/"), INK_DIM); y += 13;
     CText6(x, y, "  dump_<start>_<size>.bin", INK_DIM); y += 19;
@@ -926,7 +929,7 @@ static void DoDump(const char **status, u8 *sr, u8 *sg, u8 *sb)
     { const char *d = PlgPath(DUMP_LEAF); int i = 0; while (d[i] && i < 319) { dir[i] = d[i]; i++; } dir[i] = 0; }
     FSUSER_CreateDirectory(cfgArchive, fsMakePath(PATH_ASCII, dir), 0); // ok if it exists
     char path[360];
-    siprintf(path, "%s/dump_%08lX_%luK.bin", dir,
+    sniprintf(path, sizeof path, "%s/dump_%08lX_%luK.bin", dir,
              (unsigned long)g_dumpStart, (unsigned long)(span / 1024));
     Handle fh;
     if (R_FAILED(FSUSER_OpenFile(&fh, cfgArchive, fsMakePath(PATH_ASCII, path),
@@ -1102,7 +1105,7 @@ static void HexDrawForm(void)
     char val[2][40];
     siprintf(val[0], "0x%08lX", (unsigned long)g_hexCursor);
     if (MemReadable(g_hexCursor)) siprintf(val[1], "0x%02X  (%u)", R8(g_hexCursor), R8(g_hexCursor));
-    else                          siprintf(val[1], "%s", T("-- (unreadable)"));
+    else                          sniprintf(val[1], sizeof val[1], "%s", T("-- (unreadable)"));
     for (int i = 0; i < 2; ++i)
     {
         int y = fy + i * (fh + g);

@@ -6,7 +6,21 @@
 // Sources/engine/.
 // ============================================================================================
 
-// Auto-repeat do D-pad para listas longas. So o D-pad repete; A/B/X/Y ficam edge-only.
+// Auto-repeat do D-pad para listas longas, e a espera de soltar botao.
+
+// Before resuming the game, wait for the buttons that closed the menu to be physically released.
+// The game is paused while the menu is open; the instant it resumes it reads the live pad, so a
+// still-held B/SELECT would fire in-game (B = sword swing).
+//
+// ALWAYS CAPPED (~2s). Never write a bare `while (HID_PAD) sleep;` - HID_PAD reads a raw hardware
+// register, and if it never comes back clear (a stuck pad, a shoulder button resting against the
+// case) the plugin spins forever WITH THE GAME PAUSED, which reads as a dead console. Two screens
+// used to do exactly that.
+static void DrainButtons(u32 mask)
+{
+    for (int i = 0; i < 125 && (HID_PAD & mask); ++i)
+        svcSleepThread(16 * 1000 * 1000);
+}
 
 // ---- D-pad auto-repeat (typematic) -------------------------------------------------------------
 // Menu loops normally use edge detection (pad & ~prev), so a held button fires once. This wraps

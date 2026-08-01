@@ -452,7 +452,7 @@ static void InfoBox(const Item *it)
         if (pad & ~prev) { if (pad & BUTTON_SELECT) g_quitToGame = 1; break; }
         prev = pad;
     }
-    while (HID_PAD) svcSleepThread(10 * 1000 * 1000);
+    DrainButtons(~0u);   // capped: a bare wait here would hang the console on a stuck pad
 }
 
 // Picker list UI (bottle contents, inventory item). Returns after A (write) or B (cancel).

@@ -95,7 +95,7 @@ static void ThemePicker(void)
             if (scroll + MAX_ROWS < fn)
                 for (int a = 0; a < 4; ++a) CFill(WIN_X + WIN_W - 14 - a, ROW_Y0 + MAX_ROWS * ROW_H - 4 - a, 1 + 2 * a, 1, GOLD);
             const char *fmode = themeFilt == 1 ? T("{Y} light") : themeFilt == 2 ? T("{Y} dark") : T("{Y} all");
-            char leg[96]; siprintf(leg, "%s  %s  %s  %s", T("{A} apply"), T("{B} cancel"), T("{L}/{R} page"), fmode);
+            char leg[96]; sniprintf(leg, sizeof leg, "%s  %s  %s  %s", T("{A} apply"), T("{B} cancel"), T("{L}/{R} page"), fmode);
             CText6Btn(WIN_X + 12, WIN_Y + WIN_H - 16, leg, INK_DIM);
             Present(); Present();
             ComposeBottom(); BotBlitComposeBoth(); // live-recolor the bottom screen with the previewed theme
@@ -163,14 +163,8 @@ static void LanguagePicker(void)
     }
 }
 
-// Before resuming the game, wait for the buttons that closed the menu to be physically released.
-// The game is paused while the menu is open; the instant it resumes it reads the live pad, so a
-// still-held B/SELECT would fire in-game (B = sword swing). Capped (~2s) so a stuck pad can't hang.
-static void DrainButtons(u32 mask)
-{
-    for (int i = 0; i < 125 && (HID_PAD & mask); ++i)
-        svcSleepThread(16 * 1000 * 1000);
-}
+// DrainButtons() lives in engine/input.inc.c - it is input plumbing, and screens included before
+// this file need it too (the info box and About used to spin on their own unbounded wait).
 
 // Cycle a Settings "picker" cheat by dir (+1 next / -1 previous). Shared by the A button (dir=+1) and
 // D-pad ←/→, so both stay in sync. Applies the same side effects/toasts as the old A-only handlers.
@@ -245,7 +239,7 @@ static void RunMenu(void)
         Present(); Present();
     }
 
-    while (HID_PAD & BUTTON_SELECT) svcSleepThread(10 * 1000 * 1000);
+    DrainButtons(BUTTON_SELECT);   // capped: SELECT opened us, wait for the release
     u32 prev = HID_PAD;
 
     // First ever launch (no Settings.cfg): ask for a language before anything else.

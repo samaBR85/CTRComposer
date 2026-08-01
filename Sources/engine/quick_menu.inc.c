@@ -78,7 +78,7 @@ static void QuickMenu(void)
     if (w > 384 - 16) w = 384 - 16;
     int h = 20 + rows * QM_RH + 6;
 
-    while (HID_PAD & BUTTON_SELECT) svcSleepThread(10 * 1000 * 1000);
+    DrainButtons(BUTTON_SELECT);   // capped: SELECT opened us, wait for the release
     u32 prev = HID_PAD;
     static int qmLastCursor = 0;              // reopen on the entry you last had selected
     int cursor = (qmLastCursor < n) ? qmLastCursor : (n > 0 ? n - 1 : 0);
