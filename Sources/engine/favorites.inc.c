@@ -51,21 +51,21 @@ static void FavSave(void)
         if (!favorite[c]) continue;
         const char *lbl = LabelForCheat(c);
         if (!lbl) continue;
-        char line[80]; int n = siprintf(line, "%s\n", lbl);
+        char line[80]; int n = sniprintf(line, sizeof line, "%s\n", lbl);
         FSFILE_Write(f, &wrote, off, line, (u32)n, FS_WRITE_FLUSH); off += wrote;
     }
     // folder favorites: '#'-prefixed, keyed by the folder's stable English title
     for (int fi = 0; fi < NUM_FOLDERS; ++fi)
     {
         if (!folderFav[fi]) continue;
-        char line[80]; int n = siprintf(line, "#%s\n", folders[fi].title);
+        char line[80]; int n = sniprintf(line, sizeof line, "#%s\n", folders[fi].title);
         FSFILE_Write(f, &wrote, off, line, (u32)n, FS_WRITE_FLUSH); off += wrote;
     }
     // tool favorites: '&'-prefixed, keyed by the tool's stable English name
     for (int ti = 0; ti < NUM_TOOLS; ++ti)
     {
         if (!toolFav[ti]) continue;
-        char line[80]; int n = siprintf(line, "&%s\n", kToolKeys[ti]);
+        char line[80]; int n = sniprintf(line, sizeof line, "&%s\n", kToolKeys[ti]);
         FSFILE_Write(f, &wrote, off, line, (u32)n, FS_WRITE_FLUSH); off += wrote;
     }
     FSFILE_SetSize(f, off);

@@ -691,7 +691,7 @@ static void ToolChecklist(void)
             CFillBlend(0, 0, BOT_W, BOT_H, BG, 230);
             CFill(6, 4, BOT_W - 12, 1, GOLD); CFill(6, BOT_H - 6, BOT_W - 12, 1, GOLD);
             const char *fl = filterMode == 0 ? "All" : filterMode == 1 ? "Todo" : "Done";
-            char flbuf[24]; siprintf(flbuf, "%s %d/%d", fl, done, cc->count);
+            char flbuf[24]; sniprintf(flbuf, sizeof flbuf, "%s %d/%d", fl, done, cc->count);
             CText6(CHKB_L, 8, "<", INK_DIM);
             CTextClip(20, 6, cc->name, 190, GOLD, 0);
             CText6(CHKB_R - 8 - C6Width(flbuf) - 10, 8, flbuf, INK_DIM);
