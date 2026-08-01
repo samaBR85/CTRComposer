@@ -25,8 +25,23 @@ o plugin já foi migrado, os mesmos trechos estarão em arquivos diferentes — 
 está* cobre os dois casos.
 
 > ⚠️ **Estas correções MUDAM o binário, de propósito.** Se você usa a verificação byte a byte da
-> migração (`cmp` contra um baseline), ela **tem que falhar** aqui. Não tente fazer bater. Por
-> isso: migre primeiro, verifique idêntico, e só então aplique isto.
+> migração (`cmp` contra um baseline), ela **tem que falhar** aqui. Não tente fazer bater.
+
+### Se você também vai migrar para `plugin/` + `engine/`
+
+A regra é **nunca intercalar** — não "sempre depois". Os dois trabalhos são independentes; o que
+não pode é aplicar correção no meio da reorganização, porque aí o `cmp` da migração acusa uma
+diferença e você não sabe se veio da correção ou de um recorte errado.
+
+**Recomendado: estas correções PRIMEIRO, a migração depois.** Dois motivos:
+
+- Enquanto o plugin é um `main.c` só, os pontos que você vai tocar estão todos no mesmo arquivo.
+  Depois da migração eles se espalham por `render`, `menu_loop`, `quick_menu`, `input` e `main.c`.
+  E este é o trabalho **sem oráculo** — vale facilitá-lo.
+- O bug some antes. Se a migração ficar para depois, o plugin já está consertado.
+
+Capture o baseline da migração **depois** de aplicar e testar tudo daqui. O baseline é só "o que
+você tem ao começar" — ele não precisa ser o código original.
 
 ---
 

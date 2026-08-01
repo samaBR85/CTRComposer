@@ -66,7 +66,7 @@ e uma linha do `Makefile`), listados na Etapa 0. Mais nada.
 > **A única exceção** são as correções de bug em `CORRECOES-MOTOR.md` (documento separado, ao lado
 > deste). Cada uma vem com o diagnóstico completo justamente para você **confirmar que se aplica
 > ao seu código** antes de mexer — não é "troque pelo nosso", é "aqui está o que estava errado e
-> por quê". E são para fazer **depois** da migração, nunca junto.
+> por quê". Faça-as antes ou depois desta migração, **nunca no meio** — ver a seção no fim.
 
 ---
 
@@ -379,7 +379,7 @@ Ao terminar, confira:
 - [ ] Nenhum `.inc.c` solto em `sources/` (todos em `plugin/` ou `engine/`)
 - [ ] O balanço de `#if`/`#endif` fecha em cada arquivo
 - [ ] **Testado no console de verdade** — abrir o menu, um cheat, uma tool, o guia, o tracker
-- [ ] Só então, as correções de `CORRECOES-MOTOR.md` — elas **mudam** o binário, de propósito
+- [ ] Se ainda não aplicou as correções de `CORRECOES-MOTOR.md`, é agora — elas **mudam** o binário, de propósito
 
 > O último item não é opcional. A verificação byte a byte prova que o *compilador* gerou o mesmo
 > código; ela não prova que você não esqueceu um arquivo fora do `#include`. Se um arquivo ficar
@@ -388,17 +388,22 @@ Ao terminar, confira:
 
 ---
 
-## Depois da migração: as correções de motor 🔴
+## As correções de motor 🔴
 
 O seu fork herdou **quatro defeitos** do motor original — um deles quebra o uso de verdade (a tela
 de cima congela ao sair do plugin). Eles estão descritos, com diagnóstico e patch, em
 **`CORRECOES-MOTOR.md`**, ao lado deste arquivo.
 
-**Não faça junto com a reorganização. Faça depois, com o checklist acima já fechado.**
+**A regra é nunca intercalar as duas coisas.** Tudo nesta migração é provado por `cmp` byte a
+byte; aquelas correções **mudam o binário de propósito**. Aplicar uma correção no meio de um
+recorte faz o `cmp` acusar diferença sem você saber se veio da correção ou de um recorte errado.
 
-Motivo da ordem: tudo até aqui é provado por `cmp` byte a byte. Aquelas correções **mudam o
-binário de propósito** — é o objetivo delas. Misturar as duas coisas destrói o oráculo, e você não
-saberia mais se a reorganização mexeu em algo que não devia.
+**Recomendado: aplique as correções ANTES, e migre depois.** Enquanto o plugin é um `main.c` só,
+os pontos que elas tocam estão todos no mesmo arquivo; depois da migração se espalham por cinco.
+E as correções são o trabalho **sem oráculo** — vale facilitá-lo. Capture o baseline da Etapa 0
+depois de aplicá-las: o baseline é só "o que você tem ao começar".
+
+Depois também funciona, desde que a migração esteja fechada e verificada antes.
 
 > O documento está separado deste de propósito: ele também serve para quem **não** vai migrar
 > agora. Os defeitos são independentes da estrutura do código e valem para o `main.c` monolítico
