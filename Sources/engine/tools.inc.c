@@ -596,7 +596,7 @@ static void SearchDrawForm(void)
 
 static void ToolSearch(void)
 {
-    KbInit(); // touch input for the form (was missing -> taps did nothing)
+    KbInit(); // the form is touch-driven; without this, taps do nothing
     if (!g_cands)
     {
         g_candCap = 0x8000; // 32768 * 12B = 384KB
@@ -798,9 +798,8 @@ static void ToolAbout(void)
                 for (int a = 0; a < 4; ++a) CFill(WIN_X + WIN_W - 16 - a, top + 3 + a, 1 + 2*a, 1, GOLD);
             if (scroll + vis < N)                    // down arrow (more below)
                 for (int a = 0; a < 4; ++a) CFill(WIN_X + WIN_W - 16 - a, footY - 6 - a, 1 + 2*a, 1, GOLD);
-            // Token is {DP}, not {D-Pad}: GlyphTok() matches a 4-char form, so any other spelling
-            // silently draws as literal text. And T(), like every other footer - this one was the
-            // only string in the plugin a translator could not reach.
+            // The token is {DP}. GlyphTok() matches that exact spelling, so anything else draws
+            // as literal text with no warning. Footers go through T() so a translator can reach them.
             CText6Btn(x, footY, T("{DP} scroll    {B} back"), INK_DIM);
             Present(); Present();
             redraw = 0;

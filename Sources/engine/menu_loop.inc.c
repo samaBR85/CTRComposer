@@ -164,7 +164,7 @@ static void LanguagePicker(void)
 }
 
 // DrainButtons() lives in engine/input.inc.c - it is input plumbing, and screens included before
-// this file need it too (the info box and About used to spin on their own unbounded wait).
+// this file need it too.
 
 // Cycle a Settings "picker" cheat by dir (+1 next / -1 previous). Shared by the A button (dir=+1) and
 // D-pad ←/→, so both stay in sync. Applies the same side effects/toasts as the old A-only handlers.

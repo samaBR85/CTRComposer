@@ -19,8 +19,8 @@
 
 // Bump EVERY build - the on-screen tag is your proof that the .3gx on the SD card is the one you
 // just compiled. Edit the three numbers for real and check the result on screen; a blind sed can
-// no-op silently. PLUGIN_TAG below is derived from these, not typed again - a stray hand-edit of
-// just one of the two used to slip past the CI, which sedded TOOLS_ONLY/PLUGIN_NAME only.
+// no-op silently. PLUGIN_VER and PLUGIN_TAG are derived from these, never typed twice, so the two
+// cannot drift apart. Keep the Version: block in the .plgInfo in sync - that one is a second file.
 #define PLUGIN_VER_MAJOR 1
 #define PLUGIN_VER_MINOR 1
 #define PLUGIN_VER_PATCH 4

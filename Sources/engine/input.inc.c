@@ -13,9 +13,8 @@
 // still-held B/SELECT would fire in-game (B = sword swing).
 //
 // ALWAYS CAPPED (~2s). Never write a bare `while (HID_PAD) sleep;` - HID_PAD reads a raw hardware
-// register, and if it never comes back clear (a stuck pad, a shoulder button resting against the
-// case) the plugin spins forever WITH THE GAME PAUSED, which reads as a dead console. Two screens
-// used to do exactly that.
+// register, and if it never comes back clear (a stuck pad, a shoulder resting against the case)
+// the plugin spins forever WITH THE GAME PAUSED, which reads as a dead console.
 static void DrainButtons(u32 mask)
 {
     for (int i = 0; i < 125 && (HID_PAD & mask); ++i)
