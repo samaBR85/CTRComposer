@@ -127,6 +127,7 @@ __attribute__((unused)) static void PluginShutdown(void)
 
 void ThreadMain(void *arg)
 {
+    (void)arg;        // svcCreateThread dictates the signature; we pass no argument
     InitThreadVars(); // must run before any newlib/hid/fs call on this thread
 
     // Make the whole game process RWX up front, exactly like CTRPluginFramework does at init.

@@ -22,7 +22,13 @@ SOURCES 	:= 	Sources
 #---------------------------------------------------------------------------------
 ARCH		:=	-march=armv6k -mlittle-endian -mtune=mpcore -mfloat-abi=hard
 
-CFLAGS		:=	-Os -mword-relocations \
+# -Wall -Wextra is worth keeping ON. This project shipped for a while without it; when it was
+# finally switched on the tree was clean apart from two deliberate cases (the unused `arg` that
+# svcCreateThread's signature forces, and `void main` in a plugin with no crt0). Silence here is
+# information - if a warning appears, read it.
+# -Wno-main: this is a plugin, not a program. Luma calls main() through the 3gx bootstrap, so it
+# takes no argc/argv and returns nothing - the standard signature would be a lie.
+CFLAGS		:=	-Os -mword-relocations -Wall -Wextra -Wno-main \
 				-fomit-frame-pointer -ffunction-sections -fno-strict-aliasing \
 				$(ARCH)
 
