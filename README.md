@@ -667,6 +667,22 @@ and the live glyph shows in the cheat's info via an inline button token (section
 
 ---
 
+## The other documents in this repo
+
+Three files sit next to this README. None of them is required reading to use the template — each
+exists for a specific situation.
+
+| File | Read it when |
+|---|---|
+| **[`CORRECOES-MOTOR.md`](CORRECOES-MOTOR.md)** | You maintain a plugin **forked from this engine** before v1.1.4. Four bugs shipped in the original engine — one of them freezes the top screen when you leave the plugin. Each entry has the symptom, the cause, a `grep` to confirm it applies to *your* fork, the patch, and a console test. |
+| **[`MIGRACAO-PLUGINS-DERIVADOS.md`](MIGRACAO-PLUGINS-DERIVADOS.md)** | Your fork still has everything in one `main.c` and you want the `plugin/` + `engine/` split. Written to be run by someone who has never seen this repo — including how to prove the reorganisation changed nothing. |
+| **[`PLANO-REFATORACAO.md`](PLANO-REFATORACAO.md)** | You want the reasoning behind the current structure: the review that prompted it, what each step did, and one proposal that was tested and **rejected** because it did not work. |
+
+<sub>The two migration documents are in Portuguese — they were written for the sessions maintaining
+the derived plugins. The code and its comments are in English.</sub>
+
+---
+
 ## Continuous integration
 
 `.github/workflows/build.yml` builds **both** `.3gx` files from the same tree on every push and
